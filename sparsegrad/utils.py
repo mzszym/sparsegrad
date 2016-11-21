@@ -32,7 +32,7 @@ def len1d(x):
     return n
 
 def shape2d(x):
-    if np.ndim(x) != 1:
+    if np.ndim(x) != 2:
         raise RuntimeError('only 2-d object supported')
     n,m=np.shape(x)
     return (n,m)

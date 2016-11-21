@@ -33,6 +33,7 @@ def _geng():
 
 class expr_base(object):
     __array_priority__ = 100
+    __array_wrap__ = None
     
     def __init__(self,T):
         self.T=T

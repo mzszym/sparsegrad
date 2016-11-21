@@ -17,10 +17,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from ._version import *
+
 from .expr import *
 from . import forward
 
 from numpy.testing import Tester
 test = Tester().test
 
-__version__ = '0.0.1'

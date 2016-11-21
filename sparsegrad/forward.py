@@ -48,26 +48,27 @@ class value(expr_base):
 
 class expr(value):
     def __init__(self,f,*args,**kwargs):
-        def getd(x):
-            if isinstance(x,value):
-                return x.dvalue
-            else:
-                return None
-        argsv=list(map(nvalue,args))
-        y=f.evaluate(*argsv,**kwargs)
-        dargs=[None]*len(args)
+        argsv=[]
+        dargsv=[]
         M=None
-        for i,a in enumerate(args):
+        has_deriv=False
+        for a in args:
             if isinstance(a,value):
                 assert M is None or M==a.M, "inconsistent matrix factories"
                 M=a.M
-                dargs[i]=a.dvalue
-        if any(a is not None for a in dargs):
+                argsv.append(a.value)
+                dargsv.append(a.dvalue)
+                has_deriv=True
+            else:
+                argsv.append(a)
+                dargsv.append(None)
+        y=f.evaluate(*argsv,**kwargs)
+        dy=None
+        if has_deriv:
             s=M.accumulator()
-            f.forward(argsv,y,list(map(getd,args)),s,**kwargs)
-            value.__init__(self,y,dvalue=s.value(),M=M)    
-        else:
-            value.__init__(self,y,dvalue=None,M=M)
+            f.forward(argsv,y,dargsv,s,**kwargs)
+            dy=s.value()
+        value.__init__(self,y,dvalue=dy,M=M)
 
 def seed(x,M=sparse.standard):
     "Return seed for x"
