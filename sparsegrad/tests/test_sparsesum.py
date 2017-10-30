@@ -16,19 +16,21 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import numpy as np
-from scipy import sparse
-from sparsegrad import forward
-from test_basic import check_scalar, check_general
-from sparsegrad.expr import sum
-from scipy.sparse import csr_matrix
+from sparsegrad import *
+sparsesum = sparsesum_bare
 
 
-def test_simple():
-    yield check_scalar, None, 1, sum, lambda x: 1.
+def test_sparsesum():
+    idx, v = sparsesum(10, [(0, 1), (0, 1), (3, -1)], compress=True)
+    assert (idx == np.asarray([0, 3])).all()
+    assert (v == np.asarray([2., -1.])).all()
 
+    x = forward.seed(np.linspace(0, 1, 11))
+    idx, d = sparsesum(
+        20, [(np.arange(11), x), (np.arange(11), x)], compress=True)
+    assert (idx == np.arange(11)).all()
+    assert (d.gradient.diagonal() == 2.).all()
 
-def test_vector():
-    yield check_general, None, np.ones(3), sum, csr_matrix([[1, 1, 1]])
-    yield check_general, None, np.asarray([1, 2, 3]), lambda x: sum(x**2), csr_matrix([[2, 4, 6]])
-    yield check_general, None, np.asarray([3, 5, 7]), lambda x: sum(x)**2, csr_matrix([[30, 30, 30]])
+    d = sparsesum(1, [(np.zeros(2, dtype=int), np.ones(2)),
+                      (np.zeros(1, dtype=int), np.ones(1))])
+    assert d == 3

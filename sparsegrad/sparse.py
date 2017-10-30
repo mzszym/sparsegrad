@@ -1,12 +1,11 @@
 # -*- coding: utf-8; -*-
 #
 # sparsegrad - automatic calculation of sparse gradient
-# Copyright (C) 2016 Marek Zdzislaw Szymanski
+# Copyright (C) 2016, 2017 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
 #
 # This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,387 +16,320 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from packaging.version import Version
 import numpy as np
 import scipy.sparse
-import scipy.version
-from packaging.version import Version
+__all__ = ['sdcsr', 'sparsity_csr', 'sample_csr_rows']
 
-from .utils import *
+index_dtype = scipy.sparse.csr_matrix((0, 0)).indptr.dtype
 
-class MatrixSum(object):
-    def __init__(self,factory):
-        self.s=None
-        self.M=factory
-    def __call__(self,u,copy=False):
-        if self.s is None:
-            if copy:
-                self.s = u.copy()
-            else:
-                self.s = u
+
+def sample_csr_rows(csr, rows):
+    "return (indptr,ix) such that csr[rows]=csr_matrix((csr.data[ix],csr.indices[ix],indptr))"
+    start = np.take(csr.indptr, rows)
+    count = np.take(csr.indptr, rows + 1) - start
+    indptr = np.empty(len(rows) + 1, dtype=csr.indptr.dtype)
+    indptr[0] = 0
+    np.cumsum(count, out=indptr[1:])
+    ix = np.repeat(start - indptr[:-1], count) + np.arange(indptr[-1])
+    return indptr, ix
+
+
+class csr_matrix_nochecking(scipy.sparse.csr_matrix):
+    def __init__(self, *args, **kwargs):
+        if not args and not kwargs:
+            scipy.sparse.spmatrix.__init__(self)
+        elif len(args) == 1 and 'shape' in kwargs and not kwargs.get('copy', False):
+            scipy.sparse.spmatrix.__init__(self)
+            data, indices, indptr = args[0]
+            self.data = np.asarray(data, dtype=kwargs.get('dtype', data.dtype))
+            self.indices = np.asarray(indices, dtype=index_dtype)
+            self.indptr = np.asarray(indptr, dtype=index_dtype)
+            self.shape = kwargs['shape']
         else:
-            self.s += u
-    def value(self):
-        if isscalar(self.s):
-            return self.s
-        else:
-            return scipy.sparse.csr_matrix(self.s)
+            super(csr_matrix_nochecking, self).__init__(*args, **kwargs)
 
-    # Workaround for Scipy versions older than 0.15.0:
-    # += is not implemented for sparse matrices
-    if Version(scipy.version.version)<Version('0.15.0'):
-        def __call__(self,u,copy=False):
-            if self.s is None:
-                if copy:
-                    self.s = u.copy()
-                else:
-                    self.s = u
-            else:
-                self.s = self.s + u
+    @classmethod
+    def fromarrays(cls, data, indices, indptr, shape):
+        self = cls()
+        self.data = data
+        self.indices = np.asarray(indices, dtype=index_dtype)
+        self.indptr = np.asarray(indptr, dtype=index_dtype)
+        self.shape = shape
+        return self
 
-class MatrixFactory(object):
-    def identityMatrix(self,n,dtype):
-        "Create square identity matrix nxn"
-        raise NotImplementedError()
-    def diagonalMatrix(self,n,xf):
-        "Create diagonal matrix nxn, with diagonal xf()"
-        raise NotImplementedError()
-    def zeroMatrix(self,shape,dtype):
-        "Create empty matrix with given shape"
-        raise NotImplementedError()
-    def chain(self,a,b):
-        "Derivative chain"
-        raise NotImplementedError()
-    def dot(self,a,b):
-        "Matrix multiplication"
-        raise NotImplementedError()
-    def vstack(self,args):
-        "Vertically stack matrices"
-        raise NotImplementedError()
-    def accumulator(self):
-        "Return accumulator"
-        return MatrixSum(self)
-    def eforward(self,value,a,da,dff):
-        "Forward propagate elementwise operation. dff() returns dvalue/da as scalar or 1-d vector, which is diagonal"
-        raise NotImplementedError()
+    @classmethod
+    def fromcsr(cls, csr):
+        self = cls()
+        if not isinstance(csr, scipy.sparse.csr_matrix):
+            csr = csr.tocsr()
+        self.data = csr.data
+        self.indices = csr.indices
+        self.indptr = csr.indptr
+        self.shape = csr.shape
+        return self
 
-class StandardFactory(MatrixFactory):
-    def identityMatrix(self,n,dtype):
-        return scipy.sparse.csr_matrix((np.ones(n,dtype=dtype),np.arange(n,dtype='i4'),np.arange(n+1,dtype='i4')),shape=(n,n))
-    def diagonalMatrix(self,n,xf):
-        x=xf()
-        if isscalar(x):
-            xa=np.empty(n,dtype=np.asarray(x).dtype)
-            xa.fill(x)
-        else:
-            xa=x
-        return scipy.sparse.csr_matrix((xa,np.arange(n,dtype='i4'),np.arange(n+1,dtype='i4')),shape=(n,n))
-    def zeroMatrix(self,shape,dtype):
-        return scipy.sparse.csr_matrix(shape,dtype=dtype)
-    def chain(self,a,b):
-        if isscalar(a):
-            return a*b
-        return self.dot(a,b)
-    def dot(self,a,b):
-        return a.dot(b)
-    def vstack(self,args):
-        return scipy.sparse.vstack(args)
-    def broadcastMatrix01d(self,n,dtype):
-        return scipy.sparse.csr_matrix((np.ones(n,dtype=dtype),np.zeros(n,dtype='i4'),np.arange(n+1,dtype='i4')),shape=(n,1))
-    def eforward(self,value,a,da,dff):
-        if isscalar(a) and not isscalar(value):
-            da=self.dot(self.broadcastMatrix01d(len1d(value),value.dtype),da)
-        if isscalar(value):
-            df=dff()
-        else:
-            df=self.diagonalMatrix(len1d(value),dff)
-        return self.chain(df,da)
+    @classmethod
+    def getrows(cls, csr, rows):
+        indptr, ix = sample_csr_rows(csr, rows)
+        return cls.fromarrays(np.take(csr.data, ix), np.take(
+            csr.indices, ix), indptr, (len(rows), csr.shape[1]))
 
-    # Workaround for Scipy versions older than 0.18.0:
-    # vstack has problems with empty matrices, unless all are converted to csr
-    if Version(scipy.version.version)<Version('0.18.0'):
-        def vstack(self,args):
-            return scipy.sparse.vstack([a.tocsr() for a in args])
-    
-class sparsematrix(object):
-    def __init__(self,shape):
-        self.T=socsr
-        self.shape=shape
-        self.ndim=2       
-    def __getitem__(self,idx):
-        return self.T(self.tocsr().__getitem__(idx))
-    def sum(self,*args,**kwargs):
-        return self.T(scipy.sparse.csr_matrix(self.tocsr().sum(*args,**kwargs)))
-    
-class socsr(sparsematrix):
-    "Sparsity-only CSR"
-    def __init__(self,m):
-        "Initialize with matrix m"
-        sparsematrix.__init__(self,m.shape)
-        if not hasattr(m,'indices') or not hasattr(m,'indptr'):
-            if hasattr(m,'tocsr'):
-                m=m.tocsr()
-            else:
-                m=scipy.sparse.csr_matrix(m)
-        self.indices=np.asarray(m.indices,dtype='i4')
-        self.indptr=np.asarray(m.indptr,dtype='i4')
-        
-    def tocsr(self):
-        return scipy.sparse.csr_matrix((np.ones(len(self.indices)),self.indices,self.indptr),shape=self.shape)
+        # n=len(rows)
+        # m=csr.shape[1]
+        # if not n:
+        #    return cls.fromarrays(csr.data[:0].copy(),csr.indices[:0].copy(),csr.indptr[:1].copy(),(0,m))
+        # if n == 1:
+        #    row,=rows
+        #    i0,i1=csr.indptr[row],csr.indptr[row+1]
+        # return
+        # cls.fromarrays(csr.data[i0:i1].copy(),csr.indices[i0:i1].copy(),np.asarray([0,i1-i0],dtype=csr.indptr.dtype),(1,m))
 
-class soidentity(sparsematrix):
-    def __init__(self,n):
-        sparsematrix.__init__(self,(n,n))
-    def tocsr(self):
-        return standard.identityMatrix(self.shape[0],np.double)
-
-class sozero(sparsematrix):
-    def __init__(self,shape):
-        sparsematrix.__init__(self,shape)
-    def tocsr(self):
-        return standard.zeroMatrix(self.shape,np.double)
-
-class sosum(MatrixSum):
-    def __call__(self,u,**kwargs):
-        MatrixSum.__call__(self,u.tocsr(),**kwargs)
-    def value(self):
-        return socsr(self.s)
-
-class SparsityFactory(MatrixFactory):
-    def identityMatrix(self,n,dtype):
-        return soidentity(n)
-    def diagonalMatrix(self,n,xf):
-        return soidentity(n)
-    def zeroMatrix(self,shape,dtype):
-        return sozero(shape)
-    def chain(self,a,b):
-        if isscalar(a):
-            return b
-        if isscalar(b):
-            return a
-        return self.dot(a,b)
-    def dot(self,a,b):
-        assert a.shape[1]==b.shape[0], "incompatible matrix dimensions"
-        shape=(a.shape[0],b.shape[1])
-        if isinstance(a,sozero) or isinstance(b,sozero):
-            return self.zeroMatrix(shape,None)
-        if isinstance(a,soidentity):
-            return b
-        if isinstance(b,soidentity):
-            return a
-        if not isinstance(a,socsr):
-            a=socsr(a)
-        return socsr(a.tocsr().dot(b.tocsr()))
-    def vstack(self,args):
-        def csrarg(x):
-            return x.tocsr()
-        return socsr(scipy.sparse.vstack(map(csrarg,args)))
-    def accumulator(self):
-        return sosum(self)
-    def broadcastMatrix01d(self,n,dtype):
-        return scipy.sparse.csr_matrix((np.ones(n,dtype=dtype),np.zeros(n,dtype='i4'),np.arange(n+1,dtype='i4')),shape=(n,1))
-    def eforward(self,value,a,da,dff):
-        if isscalar(a) and not isscalar(value):
-            return self.chain(standard.broadcastMatrix01d(len1d(value),np.double),da)
-        else:
-            return da
-
-class csr_nocheck(scipy.sparse.csr_matrix):
-    "Scipy CSR matrix where check_format does nothing"
-    def check_format(self,full_check=False):
+    def check_format(self, full_check=True):
         pass
 
-class sdcsr(scipy.sparse.spmatrix):
-    """
-    Scaled CSR matrix, which can be written as product s diag(d) M,
-    where s is scalar, d is scalar or vector, and M is a 
-    general matrix (None denotes identity matrix).
-    
-    This allows to optimize typical operations:
-    
-    - multiplication by scalar: 
-    k (s diag(d) M) = (ks) diag(d)
-    
-    - multiplication by diagonal matrix: 
-    diag(u) (s diag(d) M) = k diag(d u) M
-    
-    - construction of diagonal matrix
-    
-    - summing, if general parts are the same:
-    (s_1 diag(d_1) M) + (s_2 diag(d_2) M) = diag(s_1*d_1+s_2*d_2) M
-    
-    @TODO Think how to support matrices which are not CSR.
-    """
-    def __init__(self,shape,scalar=1.,diagonal=1.,general=None):
-        scipy.sparse.spmatrix.__init__(self)
-        self.shape=shape
-        self.ndim=2
-        self.format='und'
-        
-        self.scalar=scalar
-        self.diagonal=diagonal
-        self.general=general
-        
-    @property
-    def dtype(self):
-        # Note: This is pretty slow
-        t=np.common_type(np.asarray(self.scalar),np.asarray(self.diagonal))
-        if not self.general:
-            return t
-        else:
-            return np.find_common_type([t,self.general.dtype])
-    
-    def dot(self,other):
-        "Matrix multiplication"
-        assert self.shape[1]==other.shape[0]
-        if isinstance(other,sdcsr):
-            scalar=self.scalar*other.scalar
-            diagonal=self.diagonal*other.diagonal
-            gother=other.general
-        else:
-            scalar=self.scalar
-            diagonal=self.diagonal
-            gother=other
-        if self.general is None:
-            general=gother
-        elif gother is None:
-            general=self.general
-        else:
-            general=self.general.dot(gother)
-        return sdcsr((self.shape[0],other.shape[1]),scalar=scalar,diagonal=diagonal,general=general)
-    
-    def __mul__(self,a):
-        "Multiplication by scalar"
-        assert np.ndim(a)==0
-        return sdcsr(self.shape,scalar=self.scalar*a,diagonal=self.diagonal,general=self.general)
-    
-    def tocsr(self,copy=False):
-        "Conversion to CSR format"
-        k=self.scalar*self.diagonal
-        if np.ndim(k)==0:
-            k=np.repeat(k,self.shape[0])
-        if self.general is None:
-            indptr=np.arange(self.shape[0]+1,dtype='i4')
-            if self.shape[1]<self.shape[0]:
-                indptr[self.shape[1]:]=self.shape[1]
-                indices=np.arange(self.shape[1],dtype='i4')
-                k=k[:self.shape[1]]
-            else:
-                indices=np.arange(self.shape[0],dtype='i4')
-            return csr_nocheck((k,indices,indptr),shape=self.shape)
-        else:
-            s=np.repeat(k,np.diff(self.general.indptr))
-            return csr_nocheck((self.general.data[:len(s)]*s,
-                                self.general.indices[:len(s)],self.general.indptr),
-                               shape=self.shape)
 
-    def tocoo(self,copy=False):
-        return self.tocsr().tocoo()
-        
-    def __iadd__(self,other):
-        "Inplace addition, supports only sdcsr with same general part"
-        assert isinstance(other,sdcsr) and other.shape==self.shape
-        assert other.general is self.general
-        self.diagonal=self.scalar*self.diagonal+other.scalar*other.diagonal
-        self.scalar=1.
-        return self
-        
-    def __add__(self,other):
-        "Addition, general purpose"
-        assert self.shape==other.shape
-        if isinstance(other,sdcsr) and other.general is self.general:
-            return sdcsr(self.shape,scalar=1.,diagonal=self.scalar*self.diagonal+other.scalar*other.diagonal,general=self.general)
-        else:
-            return self.tocsr()+other
-        
-    def __getitem__(self,idx):
-        return self.tocsr().__getitem__(idx)
-    
-    def sum(self,**kwargs):
-        return csr_nocheck(self.tocsr().sum(**kwargs))
-                
-    __radd__=__add__
-    __rmul__=__mul__
-        
-    def __repr__(self):
-        return 'sdcsr'
-        
-    def __str__(self):
-        return 'sdcsr'
-    
-    def copy(self):
-        return sdcsr(self.shape,scalar=self.scalar,diagonal=self.diagonal,general=self.general)
+csr_matrix = csr_matrix_nochecking
 
-class sdsum:
-    """
-    Accumulator accelerating operations involving sdcsr, taking advantage of
-    
-    (s_1 diag(d_1) M) + (s_2 diag(d_2) M) = diag(s_1*d_1+s_2*d_2) M
-    
-    All sdcsr matrices are accumulated by general part M (which is assumed
-    immutable), and general matrices are summed directly. 
-    
-    At the end, if there was only one general matrix M involved, result is
-    returned as sdcsr. Otherwise, sdcsr terms are converted to general matrices
-    and summed.
-    
-    Summing order is preserved as follows: firstly, general matrices in order
-    of appearance. Then, sdcsr in order of appearance of general parts.
-    """
-    def __init__(self,factory):
-        self.acc={}
-        self.general=MatrixSum(factory)
-        self.order=[]
-        self.M=factory
-        
-    def __call__(self,u,copy=False):
-        if isinstance(u,sdcsr):
-            k=id(u.general)
-            if k in self.acc:
-                self.acc[k]+=u
+
+def _stackconv(mat):
+    return mat
+
+
+# Workaround for Scipy versions older than 0.18.0:
+# vstack has problems with empty matrices, unless all are converted to csr
+if Version(scipy.version.version) < Version('0.18.0'):
+    def _stackconv(mat):
+        if not mat.shape:
+            return csr_matrix((np.atleast_1d(mat), np.zeros(
+                1, dtype=index_dtype), np.arange(2, dtype=index_dtype)), shape=(1, 1))
+        if not mat.shape[0]:
+            return mat.tocsr()
+        return mat
+
+
+def diagonal(x, n):
+    return csr_matrix.fromarrays(x, np.arange(n), np.arange(n + 1), (n, n))
+
+
+class sdcsr(object):
+    def __init__(self, mshape, s=np.asarray(1), diag=np.asarray(1), M=None):
+        self.mshape = mshape
+        self.s = s
+        self.diag = diag
+        #assert M is None or isinstance(M,scipy.sparse.csr_matrix), 'invalid matrix type %r'%M.__class__
+        self.M = M
+        self._value = None
+
+    def _evaluate(self):
+        p = self.s * self.diag
+        if self.M is None:
+            if self.mshape == (None, None):
+                return p
             else:
-                if copy:
-                    self.acc[k]=u.copy()
+                n = self.mshape[0]
+                # self.mshape[1] must be n
+                if not p.shape:
+                    v = np.empty(n, dtype=p.dtype)
+                    v.fill(p)
+                    p = v
+                return diagonal(p, n)
+        else:
+            if p.shape:
+                return csr_matrix.fromarrays(self.M.data[:self.M.indptr[-1]] * np.repeat(
+                    p, np.diff(self.M.indptr)), self.M.indices, self.M.indptr, self.M.shape)
+            else:
+                if p != 1.:
+                    return csr_matrix.fromarrays(
+                        self.M.data * p, self.M.indices, self.M.indptr, self.M.shape)
                 else:
-                    self.acc[k]=u
-                self.order.append(k)
+                    return self.M
+
+    def tovalue(self):
+        if self._value is None:
+            self._value = self._evaluate()
+        return self._value
+
+    def getitem_general(self, output, idx):
+        mshape = self._mshape(output)
+        if self.M is None:
+            v = self.tovalue()[idx]
+            return self.__class__(mshape=mshape, M=v)
         else:
-            self.general(u,copy=copy)
-    
-    def value(self):
-        # No need to make CSR?
-        if self.general.s is None and len(self.order)==1:
-            return self.acc[self.order[0]]        
-        # Accumulate final CSR
-        for k in self.order:
-            self.general(self.acc[k].tocsr(),copy=False)
-        self.acc={}
-        self.order=[]
-        return self.general.value()
+            M = self.M[idx]
+            if self.diag.shape:
+                diag = np.asarray(self.diag[idx])
+            else:
+                diag = self.diag
+            return self.__class__(mshape=mshape, s=self.s, diag=diag, M=M)
 
-class sdcsrFactory(StandardFactory):
-    "MatrixFactory involving sdcsr in computation"
-    def identityMatrix(self, n, dtype):
-        return sdcsr((n,n),scalar=np.ones((),dtype=dtype))
-    def diagonalMatrix(self, n, xf):
-        return sdcsr((n,n),diagonal=xf())
-    def zeroMatrix(self,shape,dtype):
-        return sdcsr(shape,scalar=np.zeros((),dtype=dtype))
-    def accumulator(self):
-        return sdsum(self)
-        
-#standard=StandardFactory()
-standard=sdcsrFactory()
-sparsity=SparsityFactory()
+    def getitem_arrayp(self, output, idx):
+        if self.diag.shape:
+            p = self.s * np.take(self.diag, idx)
+        else:
+            p = self.s * self.diag
+        n = len(idx)
+        mshape = self._mshape(output)
+        if self.M is None:
+            P = csr_matrix.fromarrays(
+                np.ones(
+                    n, dtype=p.dtype), idx, np.arange(
+                    len(idx) + 1), mshape)
+            return self.new(mshape, p, P)
+        else:
+            return self.new(mshape, p, csr_matrix.getrows(self.M, idx))
+        #
+        #P = csr_matrix.fromarrays(np.ones(n,dtype=dtype),idx,np.arange(len(idx)+1),mshape)
+        # if self.M is not None:
+        #    return self.new(mshape,p,P * self.M)
+        # else:
+        #    return self.new(mshape,p,P)
+
+    @classmethod
+    def new(cls, mshape, diag=np.asarray(1), M=None):
+        "alternative constructor, which checks diagonal part and assigns to scalar/vector part properly"
+        if diag.shape:
+            return cls(mshape, diag=diag, M=M)
+        else:
+            return cls(mshape, s=diag, M=M)
+
+    def zero(self, output):
+        mshape = self._mshape(output)
+        if mshape == (None, None):
+            return self.__class__(mshape, s=np.asarray(0.))
+        else:
+            n, m = mshape
+            if n is None:
+                n = 1
+            if m is None:
+                m = 1
+            return self.__class__(mshape, M=csr_matrix((n, m)))
+
+    def _mshape(self, output):
+        if output.shape:
+            return (output.shape[0], self.mshape[1])
+        else:
+            return (None, self.mshape[1])
+
+    def _broadcast(self, n):
+        B = csr_matrix.fromarrays(
+            np.ones(n), np.zeros(n), np.arange(
+                n + 1), (n, 1))
+        if self.M is None:
+            return B
+        else:
+            return B * self.M
+
+    def broadcast(self, output):
+        mshape = self._mshape(output)
+        if mshape[0] == self.mshape[0]:
+            return self
+        return self.__class__(
+            mshape, s=self.s, diag=self.diag, M=self._broadcast(mshape[0]))
+
+    def chain(self, output, x):
+        "return DIAG(B_output(x)).B_output'.self"
+        diag = (self.s * x) * self.diag
+        mshape = self._mshape(output)
+        if mshape[0] != self.mshape[0]:
+            M = self._broadcast(mshape[0])
+        else:
+            M = self.M
+        return self.new(mshape, diag, M)
+
+    @classmethod
+    def fma(cls, output, *terms):
+        "return sum(d.chain(output,x) for x,d in terms)"
+        xfirst, dfirst = terms[0]
+        if output.shape:
+            mshape = (output.shape[0], dfirst.mshape[1])
+        else:
+            mshape = (None, dfirst.mshape[1])
+        M = dfirst.M
+        if all(d.M is M for x, d in terms[1:]):
+            diag = sum((d.s * x) * d.diag for x, d in terms)
+            if mshape[0] != dfirst.mshape[0]:
+                M = dfirst._broadcast(mshape[0])
+            return cls.new(mshape, diag, M)
+        v = dfirst.chain(output, xfirst).tovalue()
+        for x, d in terms[1:]:
+            v = v + d.chain(output, x).tovalue()
+        return cls(mshape, M=v)
+
+    fma2 = fma
+
+    def __add__(self, other):
+        if other.M is self.M:
+            return self.new(self.mshape, self.s * self.diag +
+                            other.s * other.diag, self.M)
+        else:
+            return self.__class__(
+                self.mshape, M=self.tovalue() + other.tovalue())
+
+    def __repr__(self):
+        return '<sdcsr mshape=%r s=%r diag=%r M=%r>' % (
+            self.mshape, self.s, self.diag, self.M)
+
+    def rdot(self, y, other):
+        d = csr_matrix.fromcsr(other) * self.tovalue()
+        if d.shape:
+            return self.__class__(d.shape, M=d)
+        else:
+            return self.__class__((None, self.mshape[1]), s=d)
+
+    def sum(self):
+        v = self.tovalue()
+        mshape = (None, self.mshape[1])
+        if v.shape:
+            return self.__class__(
+                mshape, M=csr_matrix(self.tovalue().sum(axis=0)))
+        else:
+            return self.__class__(mshape, s=v)
+
+    def vstack(self, output, parts):
+        mshape = self._mshape(output)
+        M = scipy.sparse.vstack(_stackconv(p.tovalue()) for p in parts).tocsr()
+        return self.new(mshape, M=M)
 
 
-run_csr_checker=False        
+class sparsity_csr(sdcsr):
+    def __init__(self, mshape, s=None, diag=None, M=None):
+        if M is not None:
+            if not isinstance(M, scipy.sparse.csr_matrix):
+                M = csr_matrix(M)
+            M.sort_indices()
+            M.data.fill(1)
+        super(sparsity_csr, self).__init__(mshape, M=M)
 
-def disable_checking_csr():
-    global csr_checker
-    csr_checker=scipy.sparse.csr_matrix.check_format
-    def check_format(obj,full_check=False):
-        if run_csr_checker:
-            csr_checker(obj,full_check=full_check)
-    scipy.sparse.csr_matrix.check_format=check_format
+    def chain(self, output, x):
+        return self.broadcast(output)
 
-disable_checking_csr()
+    @classmethod
+    def fma(cls, output, *terms):
+        xfirst, dfirst = terms[0]
+        if output.shape:
+            mshape = (output.shape[0], dfirst.mshape[1])
+        else:
+            mshape = (None, dfirst.mshape[1])
+        M = dfirst.M
+        if all(d.M is M for x, d in terms[1:]):
+            if mshape[0] != dfirst.mshape[0]:
+                M = dfirst._broadcast(mshape[0])
+            return cls.new(mshape, M=M)
+        v = dfirst.chain(output, xfirst).tovalue()
+        for x, d in terms[1:]:
+            v = v + d.chain(output, x).tovalue()
+        return cls(mshape, M=v)
+
+    fma2 = fma
+
+    def rdot(self, y, other):
+        # must convert other to sparsity pattern, otherwise cancellation could
+        # occur
+        x = csr_matrix(other).sorted_indices()
+        x.data.fill(1.)
+        d = x.dot(self.tovalue())
+        if d.shape:
+            return self.__class__(d.shape, M=d)
+        else:
+            return self.__class__((None, self.mshape[1]), s=d)
