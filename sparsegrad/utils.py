@@ -17,8 +17,6 @@
 #
 
 import numpy as np
-import scipy.sparse
-
 
 def isscalar(x):
     if isinstance(x, float):

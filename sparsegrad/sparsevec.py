@@ -20,7 +20,7 @@ import numpy as np
 from .expr import hstack
 from .sparse import csr_matrix, sdcsr
 from .forward import forward_value, nvalue
-import scipy.sparse
+from . import impl
 
 __all__ = ['sparsevec', 'sparsesum', 'sparsesum_bare']
 
@@ -32,7 +32,7 @@ class sparsevec(object):
         self.shape = (n,)
 
 
-class csc_matrix_unchecked(scipy.sparse.csc_matrix):
+class csc_matrix_unchecked(impl.sparse.csc_matrix):
     def check(self, *args):
         pass
 

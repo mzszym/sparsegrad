@@ -23,7 +23,7 @@ with open('sparsegrad/_version.py') as version_file:
 
 setup(name='sparsegrad',
       version=version,
-      packages=['sparsegrad', 'sparsegrad.tests'],
+      packages=['sparsegrad', 'sparsegrad.impl', 'sparsegrad.tests'],
       url='http://www.marekszymanski.com/software/sparsegrad',
       license='GNU Affero General Public License v3',
       author='Marek Zdzislaw Szymanski',
