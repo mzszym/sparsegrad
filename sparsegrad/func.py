@@ -182,3 +182,13 @@ def arccosh(args, value):
 @uderiv(np.arctanh)
 def arctanh(args, value):
     yield lambda: _reciprocal(-np.square(args[0]) + 1.)
+
+@uderiv(np.expm1)
+def expm1(args, value):
+    x,=args
+    yield lambda: np.exp(x)
+
+@uderiv(np.log1p)
+def log1p(args, value):
+    x,=args
+    yield lambda: _reciprocal(1.+x)
