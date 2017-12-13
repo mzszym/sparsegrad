@@ -99,25 +99,32 @@ class forward_value(expr_base):
     def __div__(self, other):
         x = self.value
         if isinstance(other, forward_value):
-            t = 1. / other.value
-            y = x * t
-            dy = self.deriv.fma2(y, (t, self.deriv), (-x * t * t, other.deriv))
+            z = other.value
+            #t = np.reciprocal(np.asarray(z,dtype=np.result_type(x,z)))
+            #y = x * t
+            y = x / z
+            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            dy = self.deriv.fma2(y, (t, self.deriv), (-y * t, other.deriv))
         else:
-            t = 1. / nvalue(other)
-            y = x * t
+            z = nvalue(other)
+            y = x / z
+            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
             dy = self.deriv.chain(y, t)
         return self.__class__(value=y, deriv=dy)
 
     def __rdiv__(self, other):
-        t = 1. / self.value
+        #t = 1. / self.value
+        z = self.value
         if isinstance(other, forward_value):
             x = other.value
-            y = x * t
-            dy = self.deriv.fma2(y, (-x * t * t, self.driv), (t, other.deriv))
+            y = x / z
+            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            dy = self.deriv.fma2(y, (-y * t, self.deriv), (t, other.deriv))
         else:
             x = nvalue(other)
-            y = x * t
-            dy = self.deriv.chain(y, -x * t * t)
+            y = x / z
+            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            dy = self.deriv.chain(y, -y * t)
         return self.__class__(value=y, deriv=dy)
     __truediv__ = __div__
     __rtruediv__ = __rdiv__

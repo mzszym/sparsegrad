@@ -34,6 +34,7 @@ def sample_csr_rows(csr, rows):
     ix = np.repeat(start - indptr[:-1], count) + np.arange(indptr[-1])
     return indptr, ix
 
+
 class csr_matrix_nochecking(impl.sparse.csr_matrix):
     def __init__(self, *args, **kwargs):
         if not args and not kwargs:

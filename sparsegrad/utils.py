@@ -18,6 +18,7 @@
 
 import numpy as np
 
+
 def isscalar(x):
     if isinstance(x, float):
         return True
