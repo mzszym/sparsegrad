@@ -16,7 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from . import func
+from sparsegrad import func
+from sparsegrad import impl
+import sparsegrad.impl.sparsevec as impl_sparsevec
 import numpy as np
 
 
@@ -33,6 +35,10 @@ def _geng():
         for name in func.known_funcs.keys():
             yield "%s=wrapped_func(func.%s)" % (name, name)
     return "\n".join(_())
+
+
+class bool_expr(object):
+    pass
 
 
 class expr_base(object):
@@ -96,13 +102,6 @@ class wrapped_func():
 exec(_geng())
 
 
-def dot(a, b):
-    if hasattr(b, 'rdot'):
-        return b.rdot(a)
-    else:
-        return a.dot(b)
-
-
 def _find_arr(arrays, attr, default=None, default_priority=0.):
     highest = default
     current = default_priority
@@ -112,6 +111,11 @@ def _find_arr(arrays, attr, default=None, default_priority=0.):
             if highest is None or priority > current:
                 highest, current = a, priority
     return highest
+
+
+def dot(a, b):
+    impl_ = _find_arr((a, b), 'dot_', default=impl)
+    return impl_.dot_(a, b)
 
 
 def where(cond, a, b):
@@ -133,3 +137,48 @@ def sum(a):
 
 def stack(*arrays):
     return hstack(arrays)
+
+
+def sparsesum(terms, **kwargs):
+    impl_ = _find_arr(
+        (a.v for a in terms),
+        'sparsesum',
+        default=impl_sparsevec)
+    return impl_.sparsesum(terms, **kwargs)
+
+
+def as_condition_value(a):
+    return np.asarray(a, dtype=np.bool)
+
+
+def broadcast_to(arr, shape):
+    impl = _find_arr([arr], 'broadcast_to', default=np)
+    return impl.broadcast_to(arr, shape)
+
+
+def branch(cond, iftrue, iffalse):
+    if isinstance(cond, bool_expr) and cond.hasattr('branch'):
+        return cond.branch(iftrue, iffalse)
+
+    def _branch(cond, iftrue, iffalse):
+        if not cond.shape:
+            if cond:
+                return iftrue(None)
+            else:
+                return iffalse(None)
+        n = len(cond)
+        r = np.arange(len(cond))
+        ixtrue = r[cond]
+        ixfalse = r[np.logical_not(cond)]
+        vtrue = impl_sparsevec.sparsevec(
+            n, ixtrue, broadcast_to(
+                iftrue(ixtrue), ixtrue.shape))
+        vfalse = impl_sparsevec.sparsevec(
+            n, ixfalse, broadcast_to(
+                iffalse(ixfalse), ixfalse.shape))
+        return sparsesum([vtrue, vfalse])
+    value = _branch(as_condition_value(cond), iftrue, iffalse)
+    if hasattr(value, 'branch_join'):
+        return value.branch_join(cond, iftrue, iffalse)
+    else:
+        return value

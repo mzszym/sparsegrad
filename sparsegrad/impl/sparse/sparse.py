@@ -18,10 +18,17 @@
 
 from packaging.version import Version
 import numpy as np
-from . import impl
-__all__ = ['sdcsr', 'sparsity_csr', 'sample_csr_rows']
+from sparsegrad import impl
+__all__ = [
+    'sdcsr',
+    'sparsity_csr',
+    'sample_csr_rows',
+    'csr_matrix',
+    'csc_matrix']
 
-index_dtype = impl.sparse.csr_matrix((0, 0)).indptr.dtype
+scipy_sparse = impl.scipy.sparse
+
+index_dtype = scipy_sparse.csr_matrix((0, 0)).indptr.dtype
 
 
 def sample_csr_rows(csr, rows):
@@ -35,12 +42,12 @@ def sample_csr_rows(csr, rows):
     return indptr, ix
 
 
-class csr_matrix_nochecking(impl.sparse.csr_matrix):
+class csr_matrix_nochecking(scipy_sparse.csr_matrix):
     def __init__(self, *args, **kwargs):
         if not args and not kwargs:
-            impl.sparse.spmatrix.__init__(self)
+            scipy_sparse.spmatrix.__init__(self)
         elif len(args) == 1 and 'shape' in kwargs and not kwargs.get('copy', False):
-            impl.sparse.spmatrix.__init__(self)
+            scipy_sparse.spmatrix.__init__(self)
             data, indices, indptr = args[0]
             self.data = np.asarray(data, dtype=kwargs.get('dtype', data.dtype))
             self.indices = np.asarray(indices, dtype=index_dtype)
@@ -61,7 +68,7 @@ class csr_matrix_nochecking(impl.sparse.csr_matrix):
     @classmethod
     def fromcsr(cls, csr):
         self = cls()
-        if not isinstance(csr, impl.sparse.csr_matrix):
+        if not isinstance(csr, scipy_sparse.csr_matrix):
             csr = csr.tocsr()
         self.data = csr.data
         self.indices = csr.indices
@@ -75,21 +82,19 @@ class csr_matrix_nochecking(impl.sparse.csr_matrix):
         return cls.fromarrays(np.take(csr.data, ix), np.take(
             csr.indices, ix), indptr, (len(rows), csr.shape[1]))
 
-        # n=len(rows)
-        # m=csr.shape[1]
-        # if not n:
-        #    return cls.fromarrays(csr.data[:0].copy(),csr.indices[:0].copy(),csr.indptr[:1].copy(),(0,m))
-        # if n == 1:
-        #    row,=rows
-        #    i0,i1=csr.indptr[row],csr.indptr[row+1]
-        # return
-        # cls.fromarrays(csr.data[i0:i1].copy(),csr.indices[i0:i1].copy(),np.asarray([0,i1-i0],dtype=csr.indptr.dtype),(1,m))
-
     def check_format(self, full_check=True):
         pass
 
 
 csr_matrix = csr_matrix_nochecking
+
+
+class csc_matrix_unchecked(impl.scipy.sparse.csc_matrix):
+    def check(self, *args):
+        pass
+
+
+csc_matrix = csc_matrix_unchecked
 
 
 def _stackconv(mat):
@@ -98,7 +103,7 @@ def _stackconv(mat):
 
 # Workaround for Scipy versions older than 0.18.0:
 # vstack has problems with empty matrices, unless all are converted to csr
-if Version(impl.version.version) < Version('0.18.0'):
+if Version(impl.scipy.version.version) < Version('0.18.0'):
     def _stackconv(mat):
         if not mat.shape:
             return csr_matrix((np.atleast_1d(mat), np.zeros(
@@ -288,14 +293,14 @@ class sdcsr(object):
 
     def vstack(self, output, parts):
         mshape = self._mshape(output)
-        M = impl.sparse.vstack(_stackconv(p.tovalue()) for p in parts).tocsr()
+        M = scipy_sparse.vstack(_stackconv(p.tovalue()) for p in parts).tocsr()
         return self.new(mshape, M=M)
 
 
 class sparsity_csr(sdcsr):
     def __init__(self, mshape, s=None, diag=None, M=None):
         if M is not None:
-            if not isinstance(M, impl.sparse.csr_matrix):
+            if not isinstance(M, scipy_sparse.csr_matrix):
                 M = csr_matrix(M)
             M.sort_indices()
             M.data.fill(1)

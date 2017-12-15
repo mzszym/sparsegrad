@@ -19,7 +19,6 @@
 from numpy.testing import *
 from sparsegrad import forward
 import numpy as np
-from sparsegrad import sparse
 from sparsegrad.utils import *
 import inspect
 import scipy.sparse

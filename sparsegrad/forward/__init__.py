@@ -16,7 +16,4 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from ._version import *
-
-from numpy.testing import Tester
-test = Tester().test
+from .forward import *

@@ -19,7 +19,7 @@
 import numpy as np
 from numpy.testing import *
 from sparsegrad import forward
-from sparsegrad.expr import *
+from sparsegrad.base import *
 import inspect
 
 _funcs = [lambda x:x,

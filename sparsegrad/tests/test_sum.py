@@ -20,7 +20,7 @@ import numpy as np
 from scipy import sparse
 from sparsegrad import forward
 from test_basic import check_scalar, check_general
-from sparsegrad.expr import sum
+from sparsegrad.base import sum
 from scipy.sparse import csr_matrix
 
 

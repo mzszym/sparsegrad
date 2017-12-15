@@ -17,12 +17,7 @@
 #
 
 import numpy as np
-from .expr import hstack
-from .sparse import csr_matrix, sdcsr
-from .forward import forward_value, nvalue
-from . import impl
-
-__all__ = ['sparsevec', 'sparsesum', 'sparsesum_bare']
+from sparsegrad.impl.sparse import csr_matrix, csc_matrix
 
 
 class sparsevec(object):
@@ -32,53 +27,30 @@ class sparsevec(object):
         self.shape = (n,)
 
 
-class csc_matrix_unchecked(impl.sparse.csc_matrix):
-    def check(self, *args):
-        pass
-
-
-def sparsesum(terms, compress=False):
+def sparsesum(terms, hstack=np.hstack, nvalue=lambda x: x,
+              wrap=lambda idx, v, y: y, check_unique=False, return_sparse=False):
     terms = list(terms)
     n, = terms[0].shape
     if not all(t.shape == (n,) for t in terms[1:]):
         raise ValueError('different shapes of terms')
     idx, v = zip(*((t.idx, t.v) for t in terms))
-    idx = hstack(idx)
+    idx = np.hstack(idx)
     v = hstack(v)
+    if check_unique:
+        if len(np.unique(idx)) < len(idx):
+            raise ValueError('indices not unique')
 
     def process_dense(n, idx, v):
         y = csr_matrix((nvalue(v), idx, np.asarray(
             [0, len(idx)])), shape=(1, n)).todense().A1
-        if isinstance(v, forward_value):
-            M = v.deriv.tovalue()
-            M = M.tocsc()
-            rows = idx[M.indices]
-            M = csc_matrix_unchecked(
-                (M.data, rows, M.indptr), shape=(
-                    n, M.shape[1]))
-            M.sort_indices()
-            M = M.tocsr()
-            return forward_value(value=y, deriv=sdcsr(mshape=M.shape, M=M))
-        else:
-            return y
+        return wrap(idx, v, y)
 
     def process_compressed(n, idx, v):
         cidx = np.unique(idx)
         idx = np.searchsorted(cidx, idx)
         v = process_dense(len(cidx), idx, v)
         return sparsevec(n, cidx, v)
-    if compress:
+    if return_sparse:
         return process_compressed(n, idx, v)
     else:
         return process_dense(n, idx, v)
-
-
-def sparsesum_bare(n, terms, unique=False, compress=False):
-    if not terms:
-        return np.zeros(n)
-    result = sparsesum((sparsevec(n, idx, v)
-                        for idx, v in terms), compress=compress)
-    if compress:
-        return result.idx, result.v
-    else:
-        return result

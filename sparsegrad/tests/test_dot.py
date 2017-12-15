@@ -19,7 +19,7 @@
 import numpy as np
 import scipy.sparse
 from sparsegrad import forward
-from sparsegrad.expr import dot
+from sparsegrad.base import dot
 from test_basic import check_general
 
 

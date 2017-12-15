@@ -16,9 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .expr import expr_base
+from sparsegrad.base import expr_base
 import numpy as np
-from . import sparse
+import sparsegrad.impl.sparse as sparse
+from sparsegrad import impl
+import sparsegrad.impl.sparsevec as impl_sparsevec
 
 __all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
 
@@ -103,12 +105,12 @@ class forward_value(expr_base):
             #t = np.reciprocal(np.asarray(z,dtype=np.result_type(x,z)))
             #y = x * t
             y = x / z
-            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            t = np.reciprocal(np.asarray(z, dtype=y.dtype))
             dy = self.deriv.fma2(y, (t, self.deriv), (-y * t, other.deriv))
         else:
             z = nvalue(other)
             y = x / z
-            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            t = np.reciprocal(np.asarray(z, dtype=y.dtype))
             dy = self.deriv.chain(y, t)
         return self.__class__(value=y, deriv=dy)
 
@@ -118,12 +120,12 @@ class forward_value(expr_base):
         if isinstance(other, forward_value):
             x = other.value
             y = x / z
-            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            t = np.reciprocal(np.asarray(z, dtype=y.dtype))
             dy = self.deriv.fma2(y, (-y * t, self.deriv), (t, other.deriv))
         else:
             x = nvalue(other)
             y = x / z
-            t = np.reciprocal(np.asarray(z,dtype=y.dtype))
+            t = np.reciprocal(np.asarray(z, dtype=y.dtype))
             dy = self.deriv.chain(y, -y * t)
         return self.__class__(value=y, deriv=dy)
     __truediv__ = __div__
@@ -184,16 +186,35 @@ class forward_value(expr_base):
             return self.getitem_scalar(idx)
 
     # Extended functions
-    def rdot(self, other):
-        y = other.dot(self.value)
-        dy = self.deriv.rdot(y, other)
-        return self.__class__(value=y, deriv=dy)
+    @classmethod
+    def dot_(cls, A, x):
+        if isinstance(A, expr_base) or not isinstance(x, value):
+            raise NotImplementedError('only supported dot(const,value)')
+        A = sparse.csr_matrix.fromcsr(A)
+        y = A.dot(x.value)
+        dy = x.deriv.rdot(y, A)
+        return cls(value=y, deriv=dy)
 
     @classmethod
     def where(cls, cond, a, b):
         # could be improved and has problems with propagation of NaN
         return np.where(cond, 1., 0.) * a + \
             np.where(np.logical_not(cond), 1., 0.) * b
+
+    def sparsesum(self, terms, **kwargs):
+        def wrap(idx, v, y):
+            n = len(y)
+            M = v.deriv.tovalue().tocsc()
+            rows = np.take(idx, M.indices)
+            M = sparse.csc_matrix(
+                (M.data, rows, M.indptr), shape=(
+                    n, M.shape[1]))
+            M.sort_indices()
+            M = M.tocsr()
+            return forward_value(
+                value=y, deriv=self.deriv.__class__(mshape=M.shape, M=M))
+        return impl_sparsevec.sparsesum(
+            terms, hstack=self.hstack, nvalue=nvalue, wrap=wrap, **kwargs)
 
     def sum(self):
         y = np.sum(self.value)
@@ -210,6 +231,19 @@ class forward_value(expr_base):
         dy = self.deriv.vstack(y, (deriv(a) for a in arrays))
         return self.__class__(value=y, deriv=dy)
 
+    @classmethod
+    def broadcast_to(cls, self, shape):
+        if self.value.shape == shape:
+            return self
+        return np.ones(shape) * self
+
+
+class forward_value_sparsity(forward_value):
+    # inherited where happens to conserve sparsity
+    def branch_join(self, cond, iftrue, iffalse):
+        t = np.ones_like(cond)
+        return self.where(cond, iftrue(t), iffalse(t))
+
 
 def seed(x, T=forward_value):
     x = np.asarray(x)
@@ -219,7 +253,7 @@ def seed(x, T=forward_value):
         return T(value=x, deriv=sparse.sdcsr(mshape=(None, None)))
 
 
-def seed_sparsity(x, T=forward_value):
+def seed_sparsity(x, T=forward_value_sparsity):
     x = np.asarray(x)
     if x.shape:
         return T(value=x, deriv=sparse.sparsity_csr(

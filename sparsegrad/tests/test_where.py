@@ -19,7 +19,7 @@
 import numpy as np
 from scipy import sparse
 from sparsegrad import forward
-from sparsegrad.expr import where
+from sparsegrad.base import where
 from test_basic import check_scalar, check_vector, generate
 
 test_values = [-1e3, -1e2, 1e-1, -1., 0., 1., 1e1, 1e2, 1e3]
