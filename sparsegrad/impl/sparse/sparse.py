@@ -217,6 +217,10 @@ class sdcsr(object):
             return (None, self.mshape[1])
 
     def _broadcast(self, n):
+        # Workaround for numpy bug. Sometimes scalar + [scalar] is returned as scalar.
+        if n is None:
+            n = 1
+
         B = csr_matrix.fromarrays(
             np.ones(n), np.zeros(n), np.arange(
                 n + 1), (n, 1))
