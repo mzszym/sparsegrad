@@ -3,3 +3,5 @@
 .cache
 MANIFEST
 doc/.ipynb_checkpoints/
+dist/
+*.egg-info/
