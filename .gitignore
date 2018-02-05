@@ -2,6 +2,7 @@
 *~
 .cache
 MANIFEST
-doc/.ipynb_checkpoints/
+.ipynb_checkpoints
+doc/_build/
 dist/
 *.egg-info/
