@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"Sparse Jacobian calculation of numpy expressions"
+
 from ._version import *
 
 from numpy.testing import Tester

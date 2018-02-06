@@ -20,6 +20,7 @@ sparsegrad is a pure Python module for calculation of sparse Jacobian matrices o
    tutorial
    shallow-water
    faq
+   modules
 
 Indices and tables
 ==================

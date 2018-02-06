@@ -38,14 +38,27 @@ def _geng():
 
 
 class bool_expr(object):
+    "Abstract base class for boolean expressions"
     pass
 
 
 class expr_base(object):
+    """
+    Base class for numpy-compatible operator overloading
+
+    It provides default overloads of arithmetic operators and methods for mathematical functions.
+    The default overloads call abstract apply method to calculate the result of operation.
+    """
+
     __array_priority__ = 100
     __array_wrap__ = None
 
     def apply(self, func, *args):
+        """
+        Evaluate and return func(*args)
+
+        Subclasses do not need to call this for all functions.
+        """
         raise NotImplementedError()
 
     def __add__(self, other): return self.apply(func.add, self, other)
@@ -87,6 +100,7 @@ class expr_base(object):
 
 
 class wrapped_func():
+    "Wrap function for compatibility with expr_base"
     def __init__(self, func):
         self.func = func
 
@@ -114,21 +128,25 @@ def _find_arr(arrays, attr, default=None, default_priority=0.):
 
 
 def dot(a, b):
+    "Equivalent of scipy.sparse.dot function aware of expr_base"
     impl_ = _find_arr((a, b), 'dot_', default=impl)
     return impl_.dot_(a, b)
 
 
 def where(cond, a, b):
+    "Equivalent of numpy.where function aware of expr_base"
     impl = _find_arr((cond, a, b), 'where', default=np)
     return impl.where(cond, a, b)
 
 
 def hstack(arrays):
+    "Equivalent of numpy.hstack function aware of expr_base"
     impl = _find_arr(arrays, 'hstack', default=np)
     return impl.hstack(arrays)
 
 
 def sum(a):
+    "Equivalent of numpy.sum function aware of expr_base"
     if isinstance(a, expr_base):
         return a.sum()
     else:
@@ -136,10 +154,12 @@ def sum(a):
 
 
 def stack(*arrays):
+    "Alias for hstack, taking arrays as separate arguments"
     return hstack(arrays)
 
 
 def sparsesum(terms, **kwargs):
+    "Sparse summing function aware of expr_base"
     impl_ = _find_arr(
         (a.v for a in terms),
         'sparsesum',
@@ -148,15 +168,33 @@ def sparsesum(terms, **kwargs):
 
 
 def as_condition_value(a):
+    "Return value as concrete boolean value"
     return np.asarray(a, dtype=np.bool)
 
 
 def broadcast_to(arr, shape):
+    "Equivalent of numpy.broadcast_to aware of expr_base"
     impl = _find_arr([arr], 'broadcast_to', default=np)
     return impl.broadcast_to(arr, shape)
 
 
 def branch(cond, iftrue, iffalse):
+    """
+    Branch execution
+
+    Note that, in some cases (propagation of sparsity pattern), both branches can executed
+    more than once.
+
+    Parameters:
+    -----------
+    cond : bool vector
+        Condition
+    iftrue : callable(idx)
+        Function called to evaluate elements with indices idx, where cond is True
+    iffalse : callable(idx)
+        Function called to evaluate elements with indices idx, where cond is False
+
+    """
     if isinstance(cond, bool_expr) and cond.hasattr('branch'):
         return cond.branch(iftrue, iffalse)
 

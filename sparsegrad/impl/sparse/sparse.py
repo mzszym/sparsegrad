@@ -16,6 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+This module contains implementation details sparse matrix operations
+"""
+
 from packaging.version import Version
 import numpy as np
 from sparsegrad import impl
@@ -30,7 +34,6 @@ scipy_sparse = impl.scipy.sparse
 
 index_dtype = scipy_sparse.csr_matrix((0, 0)).indptr.dtype
 
-
 def sample_csr_rows(csr, rows):
     "return (indptr,ix) such that csr[rows]=csr_matrix((csr.data[ix],csr.indices[ix],indptr))"
     start = np.take(csr.indptr, rows)
@@ -43,6 +46,13 @@ def sample_csr_rows(csr, rows):
 
 
 class csr_matrix_nochecking(scipy_sparse.csr_matrix):
+    """
+
+    Subclass of scipy.sparse.csr_matrix which does not perform checking matrix format checking.
+
+    When possible, it avoids going through original csr_matrix constructor which is very slow.
+    """
+
     def __init__(self, *args, **kwargs):
         if not args and not kwargs:
             scipy_sparse.spmatrix.__init__(self)
@@ -58,6 +68,7 @@ class csr_matrix_nochecking(scipy_sparse.csr_matrix):
 
     @classmethod
     def fromarrays(cls, data, indices, indptr, shape):
+        "Optimized matrix constructor from individual CSR arrays, returns csr_matrix((data,indices,indptr),shape=shape)"
         self = cls()
         self.data = data
         self.indices = np.asarray(indices, dtype=index_dtype)
@@ -67,6 +78,7 @@ class csr_matrix_nochecking(scipy_sparse.csr_matrix):
 
     @classmethod
     def fromcsr(cls, csr):
+        "Optimized matrix construction from CSR matrix, returns csr_matrix(csr)"
         self = cls()
         if not isinstance(csr, scipy_sparse.csr_matrix):
             csr = csr.tocsr()
@@ -78,6 +90,7 @@ class csr_matrix_nochecking(scipy_sparse.csr_matrix):
 
     @classmethod
     def getrows(cls, csr, rows):
+        "Optimize row extractor, returns csr[rows]"
         indptr, ix = sample_csr_rows(csr, rows)
         return cls.fromarrays(np.take(csr.data, ix), np.take(
             csr.indices, ix), indptr, (len(rows), csr.shape[1]))
@@ -90,6 +103,9 @@ csr_matrix = csr_matrix_nochecking
 
 
 class csc_matrix_unchecked(impl.scipy.sparse.csc_matrix):
+    """
+    Subclass of scipy.sparse.csc_matrix which does not perform checking matrix format checking.
+    """
     def check(self, *args):
         pass
 
@@ -114,10 +130,26 @@ if Version(impl.scipy.version.version) < Version('0.18.0'):
 
 
 def diagonal(x, n):
+    "Return n x n matrix diag(x)"
     return csr_matrix.fromarrays(x, np.arange(n), np.arange(n + 1), (n, n))
 
 
 class sdcsr(object):
+    r"""
+    Scaled matrix, which is stored as
+
+    .. math::
+
+       s \cdot diag( \mathbf{diag} ) \cdot \mathbf{M}
+
+    where s is scalar, diag is row scaling vector (scalar and vector allowed), and
+    M is general part (None is allowed to indicate diagonal matrix).
+
+    mshape stores matrix shape. None for mshape[0] denotes differentation of scalar.
+    None for mshape[1] denotes differentiation with repsect to scalar.
+
+    No copies of M, diag are made, therefore they must be constant objects.
+    """
     def __init__(self, mshape, s=np.asarray(1), diag=np.asarray(1), M=None):
         self.mshape = mshape
         self.s = s
@@ -151,11 +183,13 @@ class sdcsr(object):
                     return self.M
 
     def tovalue(self):
+        "Return this matrix as standard CSR matrix. The result is cached."
         if self._value is None:
             self._value = self._evaluate()
         return self._value
 
     def getitem_general(self, output, idx):
+        "Generate Jacobian matrix for operation output=x[idx], this matrix being Jacobian of x. General version."
         mshape = self._mshape(output)
         if self.M is None:
             v = self.tovalue()[idx]
@@ -169,6 +203,7 @@ class sdcsr(object):
             return self.__class__(mshape=mshape, s=self.s, diag=diag, M=M)
 
     def getitem_arrayp(self, output, idx):
+        "Generate Jacobian matrix for operation output=x[idx], this matrix being Jacobian of x. idx is array with all entries positive."
         if self.diag.shape:
             p = self.s * np.take(self.diag, idx)
         else:
@@ -192,13 +227,14 @@ class sdcsr(object):
 
     @classmethod
     def new(cls, mshape, diag=np.asarray(1), M=None):
-        "alternative constructor, which checks diagonal part and assigns to scalar/vector part properly"
+        "Alternative constructor, which checks dimension of diag and assigns to scalar/vector part properly"
         if diag.shape:
             return cls(mshape, diag=diag, M=M)
         else:
             return cls(mshape, s=diag, M=M)
 
     def zero(self, output):
+        "Return empty Jacobian, which would result from output=0*x, this matrix being Jacobian of x."
         mshape = self._mshape(output)
         if mshape == (None, None):
             return self.__class__(mshape, s=np.asarray(0.))
@@ -230,6 +266,7 @@ class sdcsr(object):
             return B * self.M
 
     def broadcast(self, output):
+        "Return broadcast matrix :math:`\mathbf{B_{output}}` for broadcasting x to output, this matrix being Jacobian of x"
         mshape = self._mshape(output)
         if mshape[0] == self.mshape[0]:
             return self
@@ -237,7 +274,10 @@ class sdcsr(object):
             mshape, s=self.s, diag=self.diag, M=self._broadcast(mshape[0]))
 
     def chain(self, output, x):
-        "return DIAG(B_output(x)).B_output'.self"
+        r"""Apply chain rule for elementwise operation
+
+        Jacobian of elementwise operation is :math:`diag(\mathbf{x})`. Return :math:`diag(\mathbf{B_{output}} \cdot \mathbf{x})\cdot\mathbf{B_{output}}\cdot\mathbf{self}`
+        """
         diag = (self.s * x) * self.diag
         mshape = self._mshape(output)
         if mshape[0] != self.mshape[0]:
@@ -248,7 +288,11 @@ class sdcsr(object):
 
     @classmethod
     def fma(cls, output, *terms):
-        "return sum(d.chain(output,x) for x,d in terms)"
+        r"""
+        Apply chain rule to elementwise functions
+
+        Returns sum(d.chain(output,x) for x,d in terms)
+        """
         xfirst, dfirst = terms[0]
         if output.shape:
             mshape = (output.shape[0], dfirst.mshape[1])
@@ -280,6 +324,7 @@ class sdcsr(object):
             self.mshape, self.s, self.diag, self.M)
 
     def rdot(self, y, other):
+        r"Return Jacobian of :math:`\mathbf{y} = \mathbf{other} \cdot \mathbf{self}`, with :math:`\cdot` denoting matrix multiplication."
         d = csr_matrix.fromcsr(other) * self.tovalue()
         if d.shape:
             return self.__class__(d.shape, M=d)
@@ -287,6 +332,7 @@ class sdcsr(object):
             return self.__class__((None, self.mshape[1]), s=d)
 
     def sum(self):
+        "Return Jacobian of y=sum(x), this matrix being Jacobian of x"
         v = self.tovalue()
         mshape = (None, self.mshape[1])
         if v.shape:
@@ -296,12 +342,14 @@ class sdcsr(object):
             return self.__class__(mshape, s=v)
 
     def vstack(self, output, parts):
+        "Return Jacobian of output=hstack(parts)"
         mshape = self._mshape(output)
         M = scipy_sparse.vstack(_stackconv(p.tovalue()) for p in parts).tocsr()
         return self.new(mshape, M=M)
 
 
 class sparsity_csr(sdcsr):
+    "This is a variant of matrix only propagating sparsity information"
     def __init__(self, mshape, s=None, diag=None, M=None):
         if M is not None:
             if not isinstance(M, scipy_sparse.csr_matrix):

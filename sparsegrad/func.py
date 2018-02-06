@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"Differentiation formulas for arithmetic operations and elementary functions"
+
 import numpy as np
 
 known_funcs = {}

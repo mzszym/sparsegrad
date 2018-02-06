@@ -16,11 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"This module contains implementation details of summing sparse vectors."
+
 import numpy as np
 from sparsegrad.impl.sparse import csr_matrix, csc_matrix
 
 
 class sparsevec(object):
+    """
+    Sparse vector of length n, with nonzero entries in arrays (idx,v) where
+    idx contains the indices of entries, and v contains the corresponding
+    values
+    """
+
     def __init__(self, n, idx, v):
         self.idx = idx
         self.v = v
@@ -29,6 +37,29 @@ class sparsevec(object):
 
 def sparsesum(terms, hstack=np.hstack, nvalue=lambda x: x,
               wrap=lambda idx, v, y: y, check_unique=False, return_sparse=False):
+    """
+    Sum sparse vectors
+
+    This is a general function, which propagates index information and numerical
+    values. Suitable functions must be supplied as arguments to propagate other
+    information.
+
+    Parameters
+    ----------
+    terms : list of sparsevec
+        terms
+    hstack : callable(vectors)
+        function to use for concatenating vectors
+    nvalue : callable(vector)
+        function to use for extracting numerical value
+    wrap : callable(idx, v, result)
+        function to use for wrapping the result, with idx, v being concatenated inputs
+    check_unique : bool
+        whether to perform test for double assignments (useful when this function is
+        used to replace item assignment)
+    return_sparse : bool
+        whether to calculate sparse results
+    """
     terms = list(terms)
     n, = terms[0].shape
     if not all(t.shape == (n,) for t in terms[1:]):
