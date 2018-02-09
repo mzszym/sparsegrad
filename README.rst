@@ -4,34 +4,39 @@ sparsegrad
 |Travis-CI-badge| |Readthedocs-badge|
 
 
-`sparsegrad` performs automatic differentiation of vector valued
-functions in Python. A significant subset of `numpy` operation is
-supported on Python scalars and `ndarrays` with dimensionality less
-than 2:
+``sparsegrad`` automatically and efficiently calculates analytical Jacobian of ``numpy`` vector valued functions. It is designed to be useful for solving large systems of non-linear equations. ``sparsegrad`` is memory efficient because it does not use the graph of computation. Arbitrary computations are supported through indexing, matrix multiplication, branching, and custom functions. 
 
--  all arithmetic operators
--  all elementary functions
--  simple and fancy indexing
--  matrix-vector product `dot`, restricted to constant matrix
--  concatenation of vectors `stack`
--  vectorized selection `where`
--  sum reduction `sum`
+Taking Jacobian with respect to variable `x` is done by replacing numerical value of `x` with sparsegrad `seed`
 
-Depending on use, `sparsegrad` can provide Jacobian matrix or sparsity
-pattern.
+..  code:: python
 
-The primary use of `sparsegrad` is to automatically evaluate Jacobian
-matrices when solving non-linear systems of equations. `sparsegrad`
-uses forward mode automatic differentiation. In contrast to backward
-mode automatic differentiation, this allows to better control the memory
-usage of calculation.
+    >>> import numpy as np
+    >>> import sparsegrad.forward as ad
+    >>> def f(x):
+    ...       return x-x[::-1]
+    >>> x=np.linspace(0,1,3)
+    >>> print(f(ad.seed(x)).dvalue)
+    (0, 0)	1.0
+    (0, 2)	-1.0
+    (2, 0)	-1.0
+    (2, 2)	1.0
 
-`sparsegrad` is Python-only and requires only `numpy` and `scipy`.
-It works both in Python 2.7 and 3.x. In contrast to other pure Python
-automatic differentiation modules, `sparsegrad` attempts to be better
-suited for calculating moderately large sparse matrices. It has been
-used for solving problems with >1M equations and >20M nonzeros without
-causing bottleneck in terms of running time or memory usage.
+``sparsegrad`` is written in pure Python. For easy installation and best portability, it does not contain extension modules. In realistic problems, it can provide similar or better performance than ADOL-C best case of `repeated calculation`. This is possible thanks to algorithmic optimizations and optimizations to avoid slow parts of ``scipy.sparse``. 
+
+``sparsegrad`` relies on ``numpy`` and ``scipy`` for computations. It is compatible with both Python 2.7 and 3.x.
+
+Installation
+------------
+
+.. code:: bash
+
+   pip install sparsegrad
+
+It is recommended to run test suite after installing
+
+.. code:: bash
+
+   python -c "import sparsegrad; sparsegrad.test()"
 
 .. |Travis-CI-badge| image:: https://travis-ci.org/mzszym/sparsegrad.svg?branch=master
    :target: https://travis-ci.org/mzszym/sparsegrad
