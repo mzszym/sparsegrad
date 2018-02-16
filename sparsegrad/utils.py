@@ -1,7 +1,7 @@
 # -*- coding: utf-8; -*-
 #
 # sparsegrad - automatic calculation of sparse gradient
-# Copyright (C) 2016, 2017 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
+# Copyright (C) 2016-2018 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -39,6 +39,7 @@ def len1d(x):
 def shape2d(x):
     "Return n,m shape of 2-d array x"
     if np.ndim(x) != 2:
-        raise ValueError('only 2-d object supported, raise ValueError is argument is not 2-d array')
+        raise ValueError(
+            'only 2-d object supported, raise ValueError is argument is not 2-d array')
     n, m = np.shape(x)
     return (n, m)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8; -*-
 #
 # sparsegrad - automatic calculation of sparse gradient
-# Copyright (C) 2016, 2017 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
+# Copyright (C) 2016-2018 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -20,6 +20,7 @@
 
 import scipy.sparse
 import scipy.version
+
 
 def dot_(a, b):
     "Proxy for a.dot(b)"

@@ -1,7 +1,7 @@
 # -*- coding: utf-8; -*-
 #
 # sparsegrad - automatic calculation of sparse gradient
-# Copyright (C) 2016, 2017 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
+# Copyright (C) 2016-2018 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -33,6 +33,7 @@ __all__ = [
 scipy_sparse = impl.scipy.sparse
 
 index_dtype = scipy_sparse.csr_matrix((0, 0)).indptr.dtype
+
 
 def sample_csr_rows(csr, rows):
     "return (indptr,ix) such that csr[rows]=csr_matrix((csr.data[ix],csr.indices[ix],indptr))"
@@ -106,6 +107,7 @@ class csc_matrix_unchecked(impl.scipy.sparse.csc_matrix):
     """
     Subclass of scipy.sparse.csc_matrix which does not perform checking matrix format checking.
     """
+
     def check(self, *args):
         pass
 
@@ -150,6 +152,7 @@ class sdcsr(object):
 
     No copies of M, diag are made, therefore they must be constant objects.
     """
+
     def __init__(self, mshape, s=np.asarray(1), diag=np.asarray(1), M=None):
         self.mshape = mshape
         self.s = s
@@ -253,7 +256,8 @@ class sdcsr(object):
             return (None, self.mshape[1])
 
     def _broadcast(self, n):
-        # Workaround for numpy bug. Sometimes scalar + [scalar] is returned as scalar.
+        # Workaround for numpy bug. Sometimes scalar + [scalar] is returned as
+        # scalar.
         if n is None:
             n = 1
 
@@ -350,6 +354,7 @@ class sdcsr(object):
 
 class sparsity_csr(sdcsr):
     "This is a variant of matrix only propagating sparsity information"
+
     def __init__(self, mshape, s=None, diag=None, M=None):
         if M is not None:
             if not isinstance(M, scipy_sparse.csr_matrix):
