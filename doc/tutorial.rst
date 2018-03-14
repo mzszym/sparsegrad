@@ -1,23 +1,6 @@
 
-sparsegrad tutorial
-===================
-
-``sparsegrad`` calculates sparse gradient of ``numpy`` vector valued
-function. ``sparsegrad`` aims to rely only on ``numpy`` and ``scipy``,
-and to be applicable for moderately large problems.
-
-Many numpy operations on 1D vectors and scalars are supported: -
-majority of elementary functions - simple and fancy indexing -
-concatenation (``stack``), choice (``where``), reduction (``sum``) -
-multiplication by constant matrix (``dot``)
-
-Calculation of sparsity pattern and of sparse gradient can be done
-without modifying function.
-
-Output is provided as ``scipy`` sparse matrix in CSR format.
-
-Currently only forward mode automatic differentiation is supported. This
-allows to control memory use.
+Tutorial
+========
 
 .. code:: python
 

@@ -1,5 +1,5 @@
-sparsegrad
-==========
+Reference
+=========
 
 .. toctree::
    :maxdepth: 4

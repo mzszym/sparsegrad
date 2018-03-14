@@ -6,21 +6,17 @@
 Welcome to sparsegrad's documentation!
 ======================================
 
-sparsegrad is a pure Python module for calculation of sparse Jacobian matrices of functions using numpy. It is applicable to functions taking 100000s of independent variables in a memory- and time- efficient manner.
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
-   installing
-   features
-   architecture
-   timing
-   tutorial
-   shallow-water
-   faq
-   modules
+   introduction.rst
+   installing.rst
+   features.rst
+   architecture.rst
+   timing.rst
+   tutorial.rst
+   modules.rst
 
 Indices and tables
 ==================

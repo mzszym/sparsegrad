@@ -1,78 +1,73 @@
-Supported features
-==================
+.. _features:
+
+Supported operations
+====================
 
 Arithmetics
 -----------
 
 - Python scalars
 
-- numpy ndarray with dimensionality 0 or 1
+- numpy ``ndarray`` with dimensionality <2
 
 - broadcasting
 
 - mathematical operators (+, -, ...)
 
-- numpy elementwise mathematical functions (`np.sin`, `np.exp`, ...)
+- numpy elementwise mathematical functions (``sin``, ``exp``, ...)
 
 Indexing
 --------
 
-sparsegrad has full support for indexing when reading arrays:
+``sparsegrad`` has full support for indexing for reading arrays:
 
-- indexing by scalars, for example `x[0]` and `x[-1]`
+- indexing by scalars, for example ``x[0]`` and ``x[-1]``
 
-- indexing by slice, for example `x[::-1]`
+- indexing by slice, for example ``x[::-1]``
 
-- indexing and by arrays, for example `x[np.arange(10)]`
+- indexing by arrays, for example ``x[np.arange(10)]``
 
-Setting individual elements in arrays should be replaced with operation of summing sparse vectors.
+Setting individual elements in arrays should be replaced with summing sparse vectors.
 
 dtype promotion
 ---------------
 
-sparsegrad does not assume a specific dtype. It follows numpy/scipy dtype coercion rules.
+``sparsegrad`` does not assume a specific ``dtype``. It follows ``numpy`` dtype coercion rules.
 
 Branching and control flow
 --------------------------
 
-Since sparsegrad does not reuse any structures, arbitrary branching of execution is allowed at level of Python code. sparsegrad objects implement all comparison operators.
+Since ``sparsegrad`` does not reuse data between evaluations, arbitrary branching of execution is allowed through Python control flow statements such as ``if``. ``sparsegrad`` objects implements all the comparison operators.
 
-Branching at element level is supported through functions `where` and `branch`. `where` is equivalent of numpy `where`, but supports correctly both numpy and sparsegrad objects.
+Branching at vector element level is supported through functions ``where`` and ``branch``.
 
-`where` has disadvantage that, for each element, both possible values are evaluated. This can be avoided by using `branch` function when calculation is expensive.
+``where`` is an equivalent of the standard ``numpy`` function, but it supports correctly ``sparsegrad`` objects. As the standard version, it has a disadvantage that both possible values must be evaluated for each element. In the case of expensive calculations, this is avoided by using ``branch`` function, which only evaluates used values.
 
 Sparse vectors
 --------------
 
-`sparsesum` is provided for summing sparse vectors with derivative information.
+``sparsegrad`` provides functions for summing sparse vectors with derivative information.
 
-Irregular vector access
+Irregular memory access
 -----------------------
 
-All irregular access, both reading and writing, is supported through multiplication by sparsematrix matrix (`dot`).
+Collecting values from non-sequential locations in memory, with optional summing, is supported through multiplication by sparse matrix (``dot``).
+
+Writing values to non-sequential locations in memory, with optional summing, is supported through summing sparse vectors (``sparsesum``).
 
 Calculation of sparsity pattern
 -------------------------------
 
-Sparsity pattern is calculating using `seed_sparsity`. 
+Sparsity pattern is calculating using ``seed_sparsity``. 
 
 Other functions
 ---------------
 
-sparsegrad provides variants of functions which work for both numpy and sparsegrad values:
+sparsegrad provides variants of standard functions that work for both numpy and sparsegrad values:
 
-- `dot(A,x)` : matrix - vector multiplication, where matrix is constant
+- ``dot(A,x)`` : matrix - vector multiplication, where matrix `A` is constant
 
-- `sum(x)` : sum of elements of a vector x
+- ``sum(x)`` : sum of elements of a vector `x`
 
-- `hstack(vecs)`, `stack(*vecs)` : concatenation of vectors vecs
+- ``hstack(vecs)``, ``stack(*vecs)`` : concatenation of vectors `vecs`
 
-Large problems
---------------
-
-sparsegrad avoids building and storing graph of data flow of whole computation. Derivative data is reachable if and only if value is reachable.
-
-Python only
------------
-
-sparsegrad is easy to install because it does not contain extension modules.
