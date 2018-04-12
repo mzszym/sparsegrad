@@ -61,7 +61,7 @@ class forward_value(expr_base):
     def __add__(self, other):
         if isinstance(other, forward_value):
             y = self.value + other.value
-            dy = self.deriv + other.deriv
+            dy = self.deriv.fma2(y, (1., self.deriv), (1., other.deriv))
         else:
             y = self.value + nvalue(other)
             dy = self.deriv.broadcast(y)
