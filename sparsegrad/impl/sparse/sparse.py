@@ -63,7 +63,7 @@ class csr_matrix_nochecking(scipy_sparse.csr_matrix):
             self.data = np.asarray(data, dtype=kwargs.get('dtype', data.dtype))
             self.indices = np.asarray(indices, dtype=index_dtype)
             self.indptr = np.asarray(indptr, dtype=index_dtype)
-            self.shape = kwargs['shape']
+            self._shape = kwargs['shape']
         else:
             super(csr_matrix_nochecking, self).__init__(*args, **kwargs)
 
@@ -74,7 +74,7 @@ class csr_matrix_nochecking(scipy_sparse.csr_matrix):
         self.data = data
         self.indices = np.asarray(indices, dtype=index_dtype)
         self.indptr = np.asarray(indptr, dtype=index_dtype)
-        self.shape = shape
+        self._shape = shape
         return self
 
     @classmethod
@@ -86,7 +86,7 @@ class csr_matrix_nochecking(scipy_sparse.csr_matrix):
         self.data = csr.data
         self.indices = csr.indices
         self.indptr = csr.indptr
-        self.shape = csr.shape
+        self._shape = csr.shape
         return self
 
     @classmethod

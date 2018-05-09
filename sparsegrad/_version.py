@@ -16,5 +16,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-version = '0.0.9'
+version = '0.0.10'
 release = version
