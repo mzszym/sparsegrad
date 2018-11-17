@@ -19,6 +19,7 @@
 from sparsegrad import func
 from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
+from sparsegrad.impl.multipledispatch import Dispatcher
 import numpy as np
 
 
