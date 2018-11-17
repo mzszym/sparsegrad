@@ -21,22 +21,6 @@ from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
 import numpy as np
 
-
-def _genu():
-    def _():
-        for name, f in func.known_ufuncs.items():
-            if f.nin == 1:
-                yield "def %s(self): return self.apply(func.%s,self)" % (name, name)
-    return "\n".join(_())
-
-
-def _geng():
-    def _():
-        for name in func.known_funcs.keys():
-            yield "%s=wrapped_func(func.%s)" % (name, name)
-    return "\n".join(_())
-
-
 class bool_expr(object):
     "Abstract base class for boolean expressions"
     pass
@@ -95,9 +79,11 @@ class expr_base(object):
     def __abs__(self):
         return self.apply(func.abs, self)
 
-    # ufuncs
-    exec(_genu())
-
+    def __getattr__(self, name):
+        if hasattr(func, name):
+            return lambda:self.apply(getattr(func, name), self)
+        else:
+            return super(expr_base, self).__getattr__(name)
 
 class wrapped_func():
     "Wrap function for compatibility with expr_base"
@@ -113,9 +99,8 @@ class wrapped_func():
         return f.evaluate(*args)
 
 
-# non ufuncs
-exec(_geng())
-
+for name in func.known_funcs.keys():
+    globals()[name] = wrapped_func(getattr(func, name))
 
 def _find_arr(arrays, attr, default=None, default_priority=0.):
     highest = default
