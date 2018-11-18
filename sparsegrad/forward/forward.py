@@ -16,14 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from sparsegrad.base import expr_base
+from sparsegrad.base import expr_base, where, dot, sum, broadcast_to
 import numpy as np
 import sparsegrad.impl.sparse as sparse
 from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
 
 __all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
-
 
 def _comparison_operators():
     def _():
@@ -237,6 +236,12 @@ class forward_value(expr_base):
             return self
         return np.ones(shape) * self
 
+where.add((object, forward_value, object), forward_value.where)
+where.add((object, object, forward_value), forward_value.where)
+where.add((object, forward_value, forward_value), forward_value.where)
+dot.add((object, forward_value), forward_value.dot_)
+sum.add((forward_value,), forward_value.sum)
+broadcast_to.add((forward_value, object), forward_value.broadcast_to)
 
 class forward_value_sparsity(forward_value):
     # inherited where happens to conserve sparsity

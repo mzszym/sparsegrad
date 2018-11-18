@@ -24,7 +24,7 @@ class RaiseDispatchError(object):
     def __init__(self, signature, candidates):
         self.signature = signature
         self.candidates = candidates
-        
+
     def __call__(self, *args, **kwargs):
         raise DispatchError('Cannot unambigously resolve  {signature} with candidates {candidates}. Please add {super_signature}.'.format(signature=self.signature, candidates=self.candidates, super_signature=super_signature(self.candidates)))
 
@@ -34,7 +34,7 @@ class Dispatcher(object):
         self._cache = dict()
         self.signatures = []
         self.name = name
-        
+
     def add(self, signature, function):
         signature = tuple(signature)
         if signature in self.functions:
@@ -42,10 +42,10 @@ class Dispatcher(object):
         self._invalidate(signature)
         self.signatures.append(signature)
         self.functions[signature] = function
-        
+
     def _invalidate(self, signature):
         self._cache = dict()
-        
+
     def _find(self, a):
         matches = []
         for signature in self.signatures:
@@ -56,7 +56,7 @@ class Dispatcher(object):
                     matches = [ match for match in matches if not _supersedes(signature, match)]
                     matches.append(signature)
         return matches
-    
+
     def _call_slowpath(self, signature, args, kwargs):
         candidates = self._find(signature)
         if len(candidates) == 1:
@@ -64,13 +64,11 @@ class Dispatcher(object):
         else:
             func = RaiseDispatchError(signature, candidates)
         self._cache[signature] = func
-        return func(*args, **kwargs)        
-    
+        return func(*args, **kwargs)
+
     def __call__(self, *args, **kwargs):
-        signature = tuple([type(a) for a in args])
+        signature = tuple([a.__class__ for a in args])
         try:
             return self._cache[signature](*args, **kwargs)
         except KeyError:
-            pass
-        return self._call_slowpath(signature, args, kwargs)
-
+            return self._call_slowpath(signature, args, kwargs)

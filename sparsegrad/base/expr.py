@@ -21,6 +21,7 @@ from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
 from sparsegrad.impl.multipledispatch import Dispatcher
 import numpy as np
+from numbers import Number
 
 
 def _genu():
@@ -38,9 +39,9 @@ def _geng():
     return "\n".join(_())
 
 
-class bool_expr(object):
-    "Abstract base class for boolean expressions"
-    pass
+#class bool_expr(object):
+#    "Abstract base class for boolean expressions"
+#    pass
 
 
 class expr_base(object):
@@ -117,48 +118,38 @@ class wrapped_func():
 # non ufuncs
 exec(_geng())
 
+def _default_array_priority(obj):
+    return getattr(obj, '__array_priority__', 0.)
+
+array_priority=Dispatcher('array_priority')
+array_priority.add((object,), _default_array_priority)
 
 def _find_arr(arrays, attr, default=None, default_priority=0.):
     highest = default
     current = default_priority
     for a in arrays:
         if hasattr(a, attr):
-            priority = getattr(a, '__array_priority__', 0.)
+            priority = array_priority(a)
             if highest is None or priority > current:
                 highest, current = a, priority
     return highest
 
-
-def dot(a, b):
-    "Equivalent of scipy.sparse.dot function aware of expr_base"
-    impl_ = _find_arr((a, b), 'dot_', default=impl)
-    return impl_.dot_(a, b)
-
-
-def where(cond, a, b):
-    "Equivalent of numpy.where function aware of expr_base"
-    impl = _find_arr((cond, a, b), 'where', default=np)
-    return impl.where(cond, a, b)
-
+dot=Dispatcher('dot')
+dot.add((object, object), impl.dot_)
+where=Dispatcher('where')
+where.add((object, object, object), np.where)
+sum=Dispatcher('sum')
+sum.add((object,), np.sum)
+broadcast_to = Dispatcher('broadcast_to')
+broadcast_to.add((object, object), np.broadcast_to)
 
 def hstack(arrays):
     "Equivalent of numpy.hstack function aware of expr_base"
     impl = _find_arr(arrays, 'hstack', default=np)
     return impl.hstack(arrays)
-
-
-def sum(a):
-    "Equivalent of numpy.sum function aware of expr_base"
-    if isinstance(a, expr_base):
-        return a.sum()
-    else:
-        return np.sum(a)
-
-
 def stack(*arrays):
     "Alias for hstack, taking arrays as separate arguments"
     return hstack(arrays)
-
 
 def sparsesum(terms, **kwargs):
     "Sparse summing function aware of expr_base"
@@ -168,19 +159,13 @@ def sparsesum(terms, **kwargs):
         default=impl_sparsevec)
     return impl_.sparsesum(terms, **kwargs)
 
-
-def as_condition_value(a):
+def _as_condition_value(a):
     "Return value as concrete boolean value"
     return np.asarray(a, dtype=np.bool)
+as_condition_value = Dispatcher('as_condition_value')
+as_condition_value.add((object,), _as_condition_value)
 
-
-def broadcast_to(arr, shape):
-    "Equivalent of numpy.broadcast_to aware of expr_base"
-    impl = _find_arr([arr], 'broadcast_to', default=np)
-    return impl.broadcast_to(arr, shape)
-
-
-def branch(cond, iftrue, iffalse):
+def _branch(cond, iftrue, iffalse):
     """
     Branch execution
 
@@ -197,8 +182,8 @@ def branch(cond, iftrue, iffalse):
         Function called to evaluate elements with indices idx, where cond is False
 
     """
-    if isinstance(cond, bool_expr) and cond.hasattr('branch'):
-        return cond.branch(iftrue, iffalse)
+    #if isinstance(cond, bool_expr) and cond.hasattr('branch'):
+    #    return cond.branch(iftrue, iffalse)
 
     def _branch(cond, iftrue, iffalse):
         if not cond.shape:
@@ -222,3 +207,6 @@ def branch(cond, iftrue, iffalse):
         return value.branch_join(cond, iftrue, iffalse)
     else:
         return value
+branch=Dispatcher('branch')
+branch.add((object, object, object,), _branch)
+
