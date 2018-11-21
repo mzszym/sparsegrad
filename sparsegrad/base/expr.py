@@ -25,6 +25,19 @@ class bool_expr(object):
     "Abstract base class for boolean expressions"
     pass
 
+class function_proxy(object):
+    def __init__(self, target):
+        self.target = target
+
+    def __get__(self, instance, cls):
+        return lambda *args, **kwargs : instance.apply(self.target, instance, *args, **kwargs)
+
+class comparison_proxy(object):
+    def __init__(self, operator):
+        self.operator = operator
+
+    def __get__(self, instance, cls):
+        return lambda other : getattr(instance.value, self.operator)(other)
 
 class expr_base(object):
     """
@@ -79,11 +92,8 @@ class expr_base(object):
     def __abs__(self):
         return self.apply(func.abs, self)
 
-    def __getattr__(self, name):
-        if hasattr(func, name):
-            return lambda:self.apply(getattr(func, name), self)
-        else:
-            return super(expr_base, self).__getattr__(name)
+for operator in [ '__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__' ]:
+    setattr(expr_base, operator, comparison_proxy(operator))
 
 class wrapped_func():
     "Wrap function for compatibility with expr_base"
@@ -98,9 +108,10 @@ class wrapped_func():
     def apply(self, f, *args):
         return f.evaluate(*args)
 
-
-for name in func.known_funcs.keys():
+for name,f in func.known_funcs.items():
     globals()[name] = wrapped_func(getattr(func, name))
+    if f.nin == 1:
+        setattr(expr_base, name, function_proxy(getattr(func, name)))
 
 def _find_arr(arrays, attr, default=None, default_priority=0.):
     highest = default
