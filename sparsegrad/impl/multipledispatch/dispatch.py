@@ -67,7 +67,7 @@ class Dispatcher(object):
         return func(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
-        signature = tuple([a.__class__ for a in args])
+        signature = tuple([type(a) for a in args])
         try:
             return self._cache[signature](*args, **kwargs)
         except KeyError:
