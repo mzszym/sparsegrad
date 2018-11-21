@@ -1,4 +1,4 @@
-__all__ = [ 'Dispatcher' ]
+__all__ = [ 'GenericFunction', 'GenericMethod', 'Dispatcher', 'DispatchError' ]
 
 def supersedes(a, b):
     """a is strictly more specific than b"""
@@ -28,12 +28,16 @@ class RaiseDispatchError(object):
     def __call__(self, *args, **kwargs):
         raise DispatchError('Cannot unambigously resolve  {signature} with candidates {candidates}. Please add {super_signature}.'.format(signature=self.signature, candidates=self.candidates, super_signature=super_signature(self.candidates)))
 
+def dispatchSignature(values):
+    return tuple([a.__class__ for a in values])
+
 class Dispatcher(object):
-    def __init__(self, name=None):
+    def __init__(self, name=None, doc=None):
         self.functions = dict()
         self._cache = dict()
         self.signatures = []
         self.name = name
+        self.doc = doc
 
     def add(self, signature, function):
         signature = tuple(signature)
@@ -42,6 +46,9 @@ class Dispatcher(object):
         self._invalidate(signature)
         self.signatures.append(signature)
         self.functions[signature] = function
+
+    def register(self, *types):
+        return lambda function : self.add(types, function)
 
     def _invalidate(self, signature):
         self._cache = dict()
@@ -57,18 +64,75 @@ class Dispatcher(object):
                     matches.append(signature)
         return matches
 
-    def _call_slowpath(self, signature, args, kwargs):
+    def _dispatch_slowpath(self, signature):
         candidates = self._find(signature)
         if len(candidates) == 1:
             func = self.functions[candidates[0]]
         else:
             func = RaiseDispatchError(signature, candidates)
         self._cache[signature] = func
+        return func
+
+    def _call_slowpath(self, signature, args, kwargs):
+        func = self._dispatch_slowpath(signature)
         return func(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
-        signature = tuple([type(a) for a in args])
+        signature = dispatchSignature(args)
         try:
             return self._cache[signature](*args, **kwargs)
         except KeyError:
-            return self._call_slowpath(signature, args, kwargs)
+            pass
+        return self._call_slowpath(signature, args, kwargs)
+
+    def dispatch(self, *signature):
+        try:
+            return self._cache[signature](*args, **kwargs)
+        except KeyError:
+            pass
+        return self._dispatch_slowpath(signature)
+
+    def __getstate__(self):
+        return dict(functions=functions, signatures=signatures, name=name, doc=doc)
+
+    def __setstate__(self, state):
+        self.name = state[name]
+        self.functions = state[functions]
+        self.signatures = state[signatures]
+        self.doc = state[doc]
+
+    @property
+    def __doc__(self):
+        lines = [ 'Multiply dispatched method {name}:'.format(name=self.name)]
+        if self.doc is not None:
+            lines.append('\t'.join(str(self.doc).splitlines()))
+            lines.append('')
+        lines = [ '{count} known implentations:'.format(count=len(self.signatures)) ]
+        for index, signature in enumerate(self.signatures):
+            function = self.functions[signature]
+            lines.append('{index} {signature}: '.format(index=index, signature=signature))
+            if function.__doc__ is not None:
+                lines.append('\t'.join(str(function.__doc__)).splitlines())
+        return '\n'.join(lines)
+
+class BoundMethod(object):
+    def __init__(self, dispatcher, instance, owner):
+        self.instance = instance
+        self.owner = owner
+        self.dispatcher = dispatcher
+
+    def __call__(self, *args, **kwargs):
+        return self.dispatcher.dispatch(*dispatchSignature(args))(self.instance, *args, **kwargs)
+
+    def add(self, *args, **kwargs):
+        self.dispatcher.add(*args, **kwargs)
+
+class MethodDispatcher(Dispatcher):
+    def __get__(self, instance, cls):
+        return BoundMethod(self, instance, cls)
+
+def GenericFunction(self, *args, **kwargs):
+    return Dispatcher(*args, **kwargs)
+
+def GenericMethod(self, *args, **kwargs):
+    return MethodDispatcher(*args, **kwargs)
