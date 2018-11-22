@@ -18,7 +18,7 @@
 
 "Sparse Jacobian calculation of numpy expressions"
 
-from ._version import *
-
 from numpy.testing import Tester
+from ._version import version
+
 test = Tester().test

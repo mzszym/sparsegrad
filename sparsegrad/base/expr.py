@@ -16,10 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import numpy as np
 from sparsegrad import func
 from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
-import numpy as np
 
 
 class bool_expr(object):
@@ -63,33 +63,47 @@ class expr_base(object):
         """
         raise NotImplementedError()
 
-    def __add__(self, other): return self.apply(func.add, self, other)
+    def __add__(self, other):
+        return self.apply(func.add, self, other)
 
-    def __radd__(self, other): return self.apply(func.add, other, self)
+    def __radd__(self, other):
+        return self.apply(func.add, other, self)
 
-    def __sub__(self, other): return self.apply(func.subtract, self, other)
+    def __sub__(self, other):
+        return self.apply(func.subtract, self, other)
 
-    def __rsub__(self, other): return self.apply(func.subtract, other, self)
+    def __rsub__(self, other):
+        return self.apply(func.subtract, other, self)
 
-    def __mul__(self, other): return self.apply(func.multiply, self, other)
+    def __mul__(self, other):
+        return self.apply(func.multiply, self, other)
 
-    def __rmul__(self, other): return self.apply(func.multiply, other, self)
+    def __rmul__(self, other):
+        return self.apply(func.multiply, other, self)
 
-    def __div__(self, other): return self.apply(func.divide, self, other)
+    def __div__(self, other):
+        return self.apply(func.divide, self, other)
 
-    def __rdiv__(self, other): return self.apply(func.divide, other, self)
+    def __rdiv__(self, other):
+        return self.apply(func.divide, other, self)
 
-    def __truediv__(self, other): return self.apply(func.divide, self, other)
+    def __truediv__(self, other):
+        return self.apply(func.divide, self, other)
 
-    def __rtruediv__(self, other): return self.apply(func.divide, other, self)
+    def __rtruediv__(self, other):
+        return self.apply(func.divide, other, self)
 
-    def __pow__(self, other): return self.apply(func.power, self, other)
+    def __pow__(self, other):
+        return self.apply(func.power, self, other)
 
-    def __rpow__(self, other): return self.apply(func.power, other, self)
+    def __rpow__(self, other):
+        return self.apply(func.power, other, self)
 
-    def __pos__(self): return self
+    def __pos__(self):
+        return self
 
-    def __neg__(self): return self.apply(func.negative, self)
+    def __neg__(self):
+        return self.apply(func.negative, self)
 
     def __getitem__(self, idx):
         return self.apply(func.getitem, self, idx)
@@ -208,8 +222,7 @@ def branch(cond, iftrue, iffalse):
         if not cond.shape:
             if cond:
                 return iftrue(None)
-            else:
-                return iffalse(None)
+            return iffalse(None)
         n = len(cond)
         r = np.arange(len(cond))
         ixtrue = r[cond]
@@ -224,5 +237,4 @@ def branch(cond, iftrue, iffalse):
     value = _branch(as_condition_value(cond), iftrue, iffalse)
     if hasattr(value, 'branch_join'):
         return value.branch_join(cond, iftrue, iffalse)
-    else:
-        return value
+    return value
