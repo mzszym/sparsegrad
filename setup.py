@@ -40,7 +40,6 @@ setup(name='sparsegrad',
       install_requires=[
           'numpy>=1.10.0',
           'scipy>=0.14.0',
-          'packaging>=14.0',
           'nose'],
       author_email='marek@marekszymanski.com',
       description='fast calculation of sparse gradients and Jacobian matrices in Python',
@@ -57,5 +56,4 @@ setup(name='sparsegrad',
           'Intended Audience :: Science/Research',
           'License :: OSI Approved :: GNU Affero General Public License v3',
           'Topic :: Scientific/Engineering :: Mathematics'
-      ]
-      )
+      ])

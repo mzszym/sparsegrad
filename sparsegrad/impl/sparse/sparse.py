@@ -20,7 +20,6 @@
 This module contains implementation details sparse matrix operations
 """
 
-from packaging.version import Version
 import numpy as np
 from sparsegrad import impl
 __all__ = [
@@ -121,7 +120,7 @@ def _stackconv(mat):
 
 # Workaround for Scipy versions older than 0.18.0:
 # vstack has problems with empty matrices, unless all are converted to csr
-if Version(impl.scipy.version.version) < Version('0.18.0'):
+if (impl.scipy_version_major, impl.scipy_version_minor) < (0, 18):
     def _stackconv(mat):
         if not mat.shape:
             return csr_matrix((np.atleast_1d(mat), np.zeros(
