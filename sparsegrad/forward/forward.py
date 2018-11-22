@@ -24,6 +24,7 @@ import sparsegrad.impl.sparsevec as impl_sparsevec
 
 __all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
 
+
 class forward_value(expr_base):
     def __new__(cls, *args, **kwargs):
         value = kwargs.pop('value')
@@ -225,6 +226,7 @@ class forward_value(expr_base):
         if self.value.shape == shape:
             return self
         return np.ones(shape) * self
+
 
 class forward_value_sparsity(forward_value):
     # inherited where happens to conserve sparsity
