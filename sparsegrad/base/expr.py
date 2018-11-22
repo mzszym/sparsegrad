@@ -39,7 +39,7 @@ def _geng():
     return "\n".join(_())
 
 
-#class bool_expr(object):
+# class bool_expr(object):
 #    "Abstract base class for boolean expressions"
 #    pass
 
@@ -118,11 +118,14 @@ class wrapped_func():
 # non ufuncs
 exec(_geng())
 
+
 def _default_array_priority(obj):
     return getattr(obj, '__array_priority__', 0.)
 
-array_priority=Dispatcher('array_priority')
+
+array_priority = Dispatcher('array_priority')
 array_priority.add((object,), _default_array_priority)
+
 
 def _find_arr(arrays, attr, default=None, default_priority=0.):
     highest = default
@@ -134,22 +137,27 @@ def _find_arr(arrays, attr, default=None, default_priority=0.):
                 highest, current = a, priority
     return highest
 
-dot=Dispatcher('dot')
+
+dot = Dispatcher('dot')
 dot.add((object, object), impl.dot_)
-where=Dispatcher('where')
+where = Dispatcher('where')
 where.add((object, object, object), np.where)
-sum=Dispatcher('sum')
+sum = Dispatcher('sum')
 sum.add((object,), np.sum)
 broadcast_to = Dispatcher('broadcast_to')
 broadcast_to.add((object, object), np.broadcast_to)
+
 
 def hstack(arrays):
     "Equivalent of numpy.hstack function aware of expr_base"
     impl = _find_arr(arrays, 'hstack', default=np)
     return impl.hstack(arrays)
+
+
 def stack(*arrays):
     "Alias for hstack, taking arrays as separate arguments"
     return hstack(arrays)
+
 
 def sparsesum(terms, **kwargs):
     "Sparse summing function aware of expr_base"
@@ -159,11 +167,15 @@ def sparsesum(terms, **kwargs):
         default=impl_sparsevec)
     return impl_.sparsesum(terms, **kwargs)
 
+
 def _as_condition_value(a):
     "Return value as concrete boolean value"
     return np.asarray(a, dtype=np.bool)
+
+
 as_condition_value = Dispatcher('as_condition_value')
 as_condition_value.add((object,), _as_condition_value)
+
 
 def _branch(cond, iftrue, iffalse):
     """
@@ -182,7 +194,7 @@ def _branch(cond, iftrue, iffalse):
         Function called to evaluate elements with indices idx, where cond is False
 
     """
-    #if isinstance(cond, bool_expr) and cond.hasattr('branch'):
+    # if isinstance(cond, bool_expr) and cond.hasattr('branch'):
     #    return cond.branch(iftrue, iffalse)
 
     def _branch(cond, iftrue, iffalse):
@@ -207,6 +219,7 @@ def _branch(cond, iftrue, iffalse):
         return value.branch_join(cond, iftrue, iffalse)
     else:
         return value
-branch=Dispatcher('branch')
-branch.add((object, object, object,), _branch)
 
+
+branch = Dispatcher('branch')
+branch.add((object, object, object,), _branch)

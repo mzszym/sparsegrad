@@ -24,6 +24,7 @@ import sparsegrad.impl.sparsevec as impl_sparsevec
 
 __all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
 
+
 def _comparison_operators():
     def _():
         for op in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
@@ -236,12 +237,14 @@ class forward_value(expr_base):
             return self
         return np.ones(shape) * self
 
+
 where.add((object, forward_value, object), forward_value.where)
 where.add((object, object, forward_value), forward_value.where)
 where.add((object, forward_value, forward_value), forward_value.where)
 dot.add((object, forward_value), forward_value.dot_)
 sum.add((forward_value,), forward_value.sum)
 broadcast_to.add((forward_value, object), forward_value.broadcast_to)
+
 
 class forward_value_sparsity(forward_value):
     # inherited where happens to conserve sparsity

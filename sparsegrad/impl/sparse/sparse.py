@@ -270,7 +270,7 @@ class sdcsr(object):
             return B * self.M
 
     def broadcast(self, output):
-        "Return broadcast matrix :math:`\mathbf{B_{output}}` for broadcasting x to output, this matrix being Jacobian of x"
+        r"Return broadcast matrix :math:`\mathbf{B_{output}}` for broadcasting x to output, this matrix being Jacobian of x"
         mshape = self._mshape(output)
         if mshape[0] == self.mshape[0]:
             return self
