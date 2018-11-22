@@ -16,33 +16,26 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import numpy as np
 from sparsegrad import func
 from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
 from sparsegrad.impl.multipledispatch import Dispatcher
-import numpy as np
-from numbers import Number
 
+class function_proxy(object):
+    def __init__(self, target):
+        self.target = target
 
-def _genu():
-    def _():
-        for name, f in func.known_ufuncs.items():
-            if f.nin == 1:
-                yield "def %s(self): return self.apply(func.%s,self)" % (name, name)
-    return "\n".join(_())
+    def __get__(self, instance, cls):
+        return lambda *args, **kwargs: instance.apply(
+            self.target, instance, *args, **kwargs)
 
+class comparison_proxy(object):
+    def __init__(self, operator):
+        self.operator = operator
 
-def _geng():
-    def _():
-        for name in func.known_funcs.keys():
-            yield "%s=wrapped_func(func.%s)" % (name, name)
-    return "\n".join(_())
-
-
-# class bool_expr(object):
-#    "Abstract base class for boolean expressions"
-#    pass
-
+    def __get__(self, instance, cls):
+        return lambda other: getattr(instance.value, self.operator)(other)
 
 class expr_base(object):
     """
@@ -63,33 +56,47 @@ class expr_base(object):
         """
         raise NotImplementedError()
 
-    def __add__(self, other): return self.apply(func.add, self, other)
+    def __add__(self, other):
+        return self.apply(func.add, self, other)
 
-    def __radd__(self, other): return self.apply(func.add, other, self)
+    def __radd__(self, other):
+        return self.apply(func.add, other, self)
 
-    def __sub__(self, other): return self.apply(func.subtract, self, other)
+    def __sub__(self, other):
+        return self.apply(func.subtract, self, other)
 
-    def __rsub__(self, other): return self.apply(func.subtract, other, self)
+    def __rsub__(self, other):
+        return self.apply(func.subtract, other, self)
 
-    def __mul__(self, other): return self.apply(func.multiply, self, other)
+    def __mul__(self, other):
+        return self.apply(func.multiply, self, other)
 
-    def __rmul__(self, other): return self.apply(func.multiply, other, self)
+    def __rmul__(self, other):
+        return self.apply(func.multiply, other, self)
 
-    def __div__(self, other): return self.apply(func.divide, self, other)
+    def __div__(self, other):
+        return self.apply(func.divide, self, other)
 
-    def __rdiv__(self, other): return self.apply(func.divide, other, self)
+    def __rdiv__(self, other):
+        return self.apply(func.divide, other, self)
 
-    def __truediv__(self, other): return self.apply(func.divide, self, other)
+    def __truediv__(self, other):
+        return self.apply(func.divide, self, other)
 
-    def __rtruediv__(self, other): return self.apply(func.divide, other, self)
+    def __rtruediv__(self, other):
+        return self.apply(func.divide, other, self)
 
-    def __pow__(self, other): return self.apply(func.power, self, other)
+    def __pow__(self, other):
+        return self.apply(func.power, self, other)
 
-    def __rpow__(self, other): return self.apply(func.power, other, self)
+    def __rpow__(self, other):
+        return self.apply(func.power, other, self)
 
-    def __pos__(self): return self
+    def __pos__(self):
+        return self
 
-    def __neg__(self): return self.apply(func.negative, self)
+    def __neg__(self):
+        return self.apply(func.negative, self)
 
     def __getitem__(self, idx):
         return self.apply(func.getitem, self, idx)
@@ -97,8 +104,9 @@ class expr_base(object):
     def __abs__(self):
         return self.apply(func.abs, self)
 
-    # ufuncs
-    exec(_genu())
+
+for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
+    setattr(expr_base, operator, comparison_proxy(operator))
 
 
 class wrapped_func():
@@ -115,8 +123,10 @@ class wrapped_func():
         return f.evaluate(*args)
 
 
-# non ufuncs
-exec(_geng())
+for name, f in func.known_funcs.items():
+    globals()[name] = wrapped_func(getattr(func, name))
+    if f.nin == 1:
+        setattr(expr_base, name, function_proxy(getattr(func, name)))
 
 
 def _default_array_priority(obj):
@@ -194,15 +204,12 @@ def _branch(cond, iftrue, iffalse):
         Function called to evaluate elements with indices idx, where cond is False
 
     """
-    # if isinstance(cond, bool_expr) and cond.hasattr('branch'):
-    #    return cond.branch(iftrue, iffalse)
 
     def _branch(cond, iftrue, iffalse):
         if not cond.shape:
             if cond:
                 return iftrue(None)
-            else:
-                return iffalse(None)
+            return iffalse(None)
         n = len(cond)
         r = np.arange(len(cond))
         ixtrue = r[cond]
@@ -217,9 +224,7 @@ def _branch(cond, iftrue, iffalse):
     value = _branch(as_condition_value(cond), iftrue, iffalse)
     if hasattr(value, 'branch_join'):
         return value.branch_join(cond, iftrue, iffalse)
-    else:
-        return value
-
+    return value
 
 branch = Dispatcher('branch')
 branch.add((object, object, object,), _branch)

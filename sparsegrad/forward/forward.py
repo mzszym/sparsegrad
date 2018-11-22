@@ -16,20 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from sparsegrad.base import expr_base, where, dot, sum, broadcast_to
 import numpy as np
-import sparsegrad.impl.sparse as sparse
-from sparsegrad import impl
-import sparsegrad.impl.sparsevec as impl_sparsevec
+from sparsegrad.impl import sparse
+from sparsegrad.impl import sparsevec as sparsevec_impl
+from sparsegrad.base import expr_base, where, dot, sum, broadcast_to
 
 __all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
-
-
-def _comparison_operators():
-    def _():
-        for op in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
-            yield 'def %s(self,other): return self.value.%s(other)' % (op, op)
-    return '\n'.join(_())
 
 
 class forward_value(expr_base):
@@ -46,9 +38,6 @@ class forward_value(expr_base):
         obj.value = value
         obj.deriv = deriv
         return obj
-
-    # comparison operators
-    exec(_comparison_operators())
 
     # getting values
     @property
@@ -154,7 +143,7 @@ class forward_value(expr_base):
             terms = tuple(
                 (f(), a.deriv) for f, a in zip(
                     df, args) if isinstance(
-                    a, forward_value))
+                        a, forward_value))
             return self.__class__(value=y, deriv=self.deriv.fma(y, *terms))
 
     # indexing
@@ -213,7 +202,7 @@ class forward_value(expr_base):
             M = M.tocsr()
             return forward_value(
                 value=y, deriv=self.deriv.__class__(mshape=M.shape, M=M))
-        return impl_sparsevec.sparsesum(
+        return sparsevec_impl.sparsesum(
             terms, hstack=self.hstack, nvalue=nvalue, wrap=wrap, **kwargs)
 
     def sum(self):

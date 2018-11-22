@@ -214,10 +214,9 @@ class sdcsr(object):
         n = len(idx)
         mshape = self._mshape(output)
         if self.M is None:
-            P = csr_matrix.fromarrays(
-                np.ones(
-                    n, dtype=p.dtype), idx, np.arange(
-                    len(idx) + 1), mshape)
+            data = np.ones(n, dtype=p.dtype)
+            indptr = np.arange(len(idx) + 1)
+            P = csr_matrix.fromarrays(data, idx, indptr, mshape)
             return self.new(mshape, p, P)
         else:
             return self.new(mshape, p, csr_matrix.getrows(self.M, idx))

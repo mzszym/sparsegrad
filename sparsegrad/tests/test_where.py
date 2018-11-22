@@ -17,9 +17,7 @@
 #
 
 import numpy as np
-from scipy import sparse
-from sparsegrad import forward
-from sparsegrad.base import where
+from sparsegrad.base import where, branch
 from test_basic import check_scalar, check_vector, generate
 
 test_values = [-1e3, -1e2, 1e-1, -1., 0., 1., 1e1, 1e2, 1e3]
@@ -45,3 +43,12 @@ def test_vector():
     for t in generate(_funcs, [np.ones(0), np.ones(
             1), np.asarray(test_values)], check_vector):
         yield t
+
+def test_branch():
+    def iftrue(idx):
+        assert tuple(idx) == (0,2,4)
+        return 0
+    def iffalse(idx):
+        assert tuple(idx) == (1,3,5)
+        return 1
+    assert (branch(np.arange(6)%2 == 0, iftrue, iffalse) == np.asarray([0,1,0,1,0,1])).all()

@@ -19,7 +19,7 @@
 "This module contains implementation details of summing sparse vectors."
 
 import numpy as np
-from sparsegrad.impl.sparse import csr_matrix, csc_matrix
+from sparsegrad.impl.sparse import csr_matrix
 
 
 class sparsevec(object):
