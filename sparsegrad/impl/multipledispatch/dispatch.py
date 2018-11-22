@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__all__ = ['GenericFunction', 'GenericMethod', 'Dispatcher', 'DispatchError']
+__all__ = ['GenericFunction', 'GenericMethod', 'Dispatcher', 'DispatchError', 'dispatch', 'dispatchmethod']
 
 
 def supersedes(a, b):
@@ -122,20 +122,20 @@ class Dispatcher(object):
 
     def dispatch(self, *signature):
         try:
-            return self._cache[signature](*args, **kwargs)
+            return self._cache[signature]
         except KeyError:
             pass
         return self._dispatch_slowpath(signature)
 
     def __getstate__(self):
-        return dict(functions=functions,
-                    signatures=signatures, name=name, doc=doc)
+        return dict(functions=self.functions,
+                    signatures=self.signatures, name=self.name, doc=self.doc)
 
     def __setstate__(self, state):
-        self.name = state[name]
-        self.functions = state[functions]
-        self.signatures = state[signatures]
-        self.doc = state[doc]
+        self.name = state['name']
+        self.functions = state['functions']
+        self.signatures = state['signatures']
+        self.doc = state['doc']
 
     @property
     def __doc__(self):
@@ -183,3 +183,16 @@ def GenericFunction(self, *args, **kwargs):
 
 def GenericMethod(self, *args, **kwargs):
     return MethodDispatcher(*args, **kwargs)
+
+def _dispatch(types, dispatcher_type, kwargs):
+    def _(func):
+        result = dispatcher_type(func.__name__, **kwargs)
+        result.add(types, func)
+        return result
+    return _
+
+def dispatch(*types, **kwargs):
+    return _dispatch(types, Dispatcher, kwargs)
+
+def dispatchmethod(*types, **kwargs):
+    return _dispatch(types, MethodDispatcher, kwargs)

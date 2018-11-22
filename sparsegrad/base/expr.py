@@ -20,7 +20,8 @@ import numpy as np
 from sparsegrad import func
 from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
-from sparsegrad.impl.multipledispatch import Dispatcher
+from sparsegrad.impl.multipledispatch import dispatch, GenericFunction
+from . import routing
 
 class function_proxy(object):
     def __init__(self, target):
@@ -108,7 +109,6 @@ class expr_base(object):
 for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
     setattr(expr_base, operator, comparison_proxy(operator))
 
-
 class wrapped_func():
     "Wrap function for compatibility with expr_base"
 
@@ -116,7 +116,7 @@ class wrapped_func():
         self.func = func
 
     def __call__(self, *args):
-        impl = _find_arr(args, 'apply', default=self)
+        impl = routing.find_implementation(args, default=self)
         return impl.apply(self.func, *args)
 
     def apply(self, f, *args):
@@ -124,70 +124,38 @@ class wrapped_func():
 
 
 for name, f in func.known_funcs.items():
-    globals()[name] = wrapped_func(getattr(func, name))
+    dispatcher = GenericFunction(name)
+    dispatcher.add((object,)*f.nin, getattr(np, name))
     if f.nin == 1:
         setattr(expr_base, name, function_proxy(getattr(func, name)))
 
-
-def _default_array_priority(obj):
-    return getattr(obj, '__array_priority__', 0.)
-
-
-array_priority = Dispatcher('array_priority')
-array_priority.add((object,), _default_array_priority)
-
-
-def _find_arr(arrays, attr, default=None, default_priority=0.):
-    highest = default
-    current = default_priority
-    for a in arrays:
-        if hasattr(a, attr):
-            priority = array_priority(a)
-            if highest is None or priority > current:
-                highest, current = a, priority
-    return highest
-
-
-dot = Dispatcher('dot')
+dot = GenericFunction('dot')
 dot.add((object, object), impl.dot_)
-where = Dispatcher('where')
-where.add((object, object, object), np.where)
-sum = Dispatcher('sum')
-sum.add((object,), np.sum)
-broadcast_to = Dispatcher('broadcast_to')
-broadcast_to.add((object, object), np.broadcast_to)
 
+where = GenericFunction('where')
+where.add((object, object, object), np.where)
+
+sum = GenericFunction('sum')
+sum.add((object,), np.sum)
+
+broadcast_to = GenericFunction('broadcast_to')
+broadcast_to.add((object, object), np.broadcast_to)
 
 def hstack(arrays):
     "Equivalent of numpy.hstack function aware of expr_base"
-    impl = _find_arr(arrays, 'hstack', default=np)
-    return impl.hstack(arrays)
-
+    return routing.hstack(routing.find_implementation(arrays), arrays)
 
 def stack(*arrays):
     "Alias for hstack, taking arrays as separate arguments"
     return hstack(arrays)
 
-
 def sparsesum(terms, **kwargs):
     "Sparse summing function aware of expr_base"
-    impl_ = _find_arr(
-        (a.v for a in terms),
-        'sparsesum',
-        default=impl_sparsevec)
-    return impl_.sparsesum(terms, **kwargs)
+    impl = routing.find_implementation((a.v for a in terms), default=impl_sparsevec)
+    return routing.sparsesum(impl, terms, **kwargs)
 
-
-def _as_condition_value(a):
-    "Return value as concrete boolean value"
-    return np.asarray(a, dtype=np.bool)
-
-
-as_condition_value = Dispatcher('as_condition_value')
-as_condition_value.add((object,), _as_condition_value)
-
-
-def _branch(cond, iftrue, iffalse):
+@dispatch(object, object, object)
+def branch(cond, iftrue, iffalse):
     """
     Branch execution
 
@@ -221,10 +189,5 @@ def _branch(cond, iftrue, iffalse):
             n, ixfalse, broadcast_to(
                 iffalse(ixfalse), ixfalse.shape))
         return sparsesum([vtrue, vfalse])
-    value = _branch(as_condition_value(cond), iftrue, iffalse)
-    if hasattr(value, 'branch_join'):
-        return value.branch_join(cond, iftrue, iffalse)
+    value = _branch(cond, iftrue, iffalse)
     return value
-
-branch = Dispatcher('branch')
-branch.add((object, object, object,), _branch)
