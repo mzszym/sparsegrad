@@ -20,12 +20,12 @@ import numpy as np
 import scipy.sparse
 from sparsegrad import forward
 from sparsegrad.base import dot
-from test_basic import check_general
-
+from sparsegrad.testing.utils import check_general
+from parameterized import parameterized
 
 def check_dot1(x, M):
     def f(x): return dot(M, x)
-    check_general(None, x, f, M)
+    check_general(x, f, M)
 
 
 def check_dot2(x, M):
@@ -33,7 +33,7 @@ def check_dot2(x, M):
     dg = g(forward.seed(x)).dvalue
 
     def f(x): return dot(M, g(x))
-    check_general(None, x, f, dot(M, dg))
+    check_general(x, f, dot(M, dg))
 
 
 def check_dot3(x, M):
@@ -41,10 +41,10 @@ def check_dot3(x, M):
 
     def f(x): return g(dot(M, x))
     dg = g(forward.seed(dot(M, x))).dvalue
-    check_general(None, x, f, dot(dg, M))
+    check_general(x, f, dot(dg, M))
 
 
-def test_dot():
+def _test_dot():
     np.random.seed(0)
     for n in [0, 1, 3, 5]:
         x = np.random.rand(n)
@@ -52,3 +52,7 @@ def test_dot():
         yield check_dot1, x, M
         yield check_dot2, x, M
         yield check_dot3, x, M
+
+@parameterized(_test_dot)
+def test_dot(func, x, M):
+    func(x, M)
