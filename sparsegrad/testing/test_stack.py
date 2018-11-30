@@ -25,30 +25,53 @@ from sparsegrad.testing.namespaces import sg
 
 stack = sg.stack
 
+
 def f(x): return x**2
+
+
 def g(x): return x**3
+
+
 def df(x): return 2 * x
+
+
 def dg(x): return 3 * x**2
+
 
 @parameterized((x,) for x in [-5, 2])
 def test_simple(x):
-    check_general(x, lambda x:stack(f(x), g(x)), csr_matrix([[df(x)],[dg(x)]]))
-    check_general(x, lambda x:stack(f(x), 0), csr_matrix([[df(x)],[0]]))
-    check_general(x, lambda x:stack(0, f(x)), csr_matrix([[0],[df(x)]]))
+    check_general(x, lambda x: stack(f(x), g(x)),
+                  csr_matrix([[df(x)], [dg(x)]]))
+    check_general(x, lambda x: stack(f(x), 0), csr_matrix([[df(x)], [0]]))
+    check_general(x, lambda x: stack(0, f(x)), csr_matrix([[0], [df(x)]]))
+
 
 @parameterized((x,) for x in [0, 1, 2, 3, 7])
 def test_split_stack(n):
     x = np.linspace(0., 4., n)
     n = int(len(x) / 2)
-    def f(x): return stack(x[:n], x[n:])
-    check_vector(x, f, lambda x:1)
 
-@parameterized((x,v) for x in [-3,3] for v in [np.ones(0), np.ones(1), np.ones(2), np.linspace(0, 1, 3)])
-def test_vector_scalar(x,y):
+    def f(x): return stack(x[:n], x[n:])
+    check_vector(x, f, lambda x: 1)
+
+
+@parameterized((x, v) for x in [-3, 3] for v in [np.ones(0),
+                                                 np.ones(1), np.ones(2), np.linspace(0, 1, 3)])
+def test_vector_scalar(x, y):
     df2d = np.atleast_2d(df(x))
     dv = np.atleast_2d(np.zeros_like(y)).transpose()
     dgxy2d = g(forward.seed(x) * y).dvalue.todense()
-    check_general(x, lambda x: stack(f(x), y), csr_matrix(np.vstack((df2d, dv))))
-    check_general(x, lambda x: stack(y, f(x)), csr_matrix(np.vstack((dv, df2d))))
-    check_general(x, lambda x: stack(f(x), g(x * y)), csr_matrix(np.vstack((df2d, dgxy2d))))
-    check_general(x, lambda x: stack(g(x * y), f(x)), csr_matrix(np.vstack((dgxy2d, df2d))))
+    check_general(
+        x, lambda x: stack(
+            f(x), y), csr_matrix(
+            np.vstack(
+                (df2d, dv))))
+    check_general(
+        x, lambda x: stack(
+            y, f(x)), csr_matrix(
+            np.vstack(
+                (dv, df2d))))
+    check_general(x, lambda x: stack(f(x), g(x * y)),
+                  csr_matrix(np.vstack((df2d, dgxy2d))))
+    check_general(x, lambda x: stack(g(x * y), f(x)),
+                  csr_matrix(np.vstack((dgxy2d, df2d))))

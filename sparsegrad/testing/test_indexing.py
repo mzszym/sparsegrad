@@ -21,7 +21,9 @@ from scipy.sparse import csr_matrix
 from parameterized import parameterized
 from sparsegrad.testing.utils import check_general
 
+
 def f(x): return x**2
+
 
 def _test_simple():
     x = np.linspace(0., 4., 5)
@@ -41,7 +43,8 @@ def _test_simple():
                                      [0, 0, 3, 2, 0],
                                      [0, 0, 4, 0, 2]])
 
+
 @parameterized(_test_simple)
 def test_simple(x, func, result):
-    f = lambda x : eval(func, globals(), dict(x=x))
+    def f(x): return eval(func, globals(), dict(x=x))
     return check_general(x, f, result)

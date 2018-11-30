@@ -39,6 +39,7 @@ functions_with_where = [
 def test_scalar(*args):
     verify_scalar(*args)
 
+
 @parameterized(product(functions_with_where, test_vectors, namespaces=['sg']))
 def test_vector(*args):
     verify_vector(*args)

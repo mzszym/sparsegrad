@@ -101,6 +101,11 @@ def abs(args, value):
 absolute = abs
 
 
+@uderiv(np.sign)
+def sign(args, value):
+    return lambda: np.where(args[0] != 0, 0., np.nan)
+
+
 @uderiv(np.reciprocal)
 def reciprocal(args, value):
     yield lambda: -value**2
@@ -123,7 +128,7 @@ def sqrt(args, value):
 
 @uderiv(np.square)
 def square(args, value):
-    yield lambda: 2. * value
+    yield lambda: 2. * args[0]
 
 
 @uderiv(np.sin)

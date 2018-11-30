@@ -25,15 +25,19 @@ scalar_tests = [
     (1, 'sum(x)', '1')
 ]
 
+
 @parameterized(scalar_tests)
 def test_simple(x, f, df):
     verify_scalar(dict(ns='sg'), x, f, df)
+
 
 vector_tests = [
     (np.ones(3), 'sum(x)', csr_matrix([[1, 1, 1]])),
     (np.asarray([1, 2, 3]), 'sum(x**2)', csr_matrix([[2, 4, 6]])),
     (np.asarray([3, 5, 7]), 'sum(x)**2', csr_matrix([[30, 30, 30]]))
 ]
+
+
 @parameterized(vector_tests)
 def test_vector(x, func, mat):
     f = lambdify(func, dict(ns='sg'))

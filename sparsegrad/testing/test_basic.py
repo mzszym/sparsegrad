@@ -83,24 +83,38 @@ hyperbolic = [
 ]
 
 all_functions = polynominals + basic_functions + trigonometric + hyperbolic
-test_scalars = [-1e3, -1., -1e-3, 1e-3, 1., 1e3]
-test_vectors = [np.ones(0), np.ones(1), np.asarray(test_scalars)]
+real_dtypes = [np.float64, np.float128]
+complex_dtypes = [np.complex128, np.complex256]
+test_dtypes = real_dtypes + complex_dtypes
+test_scalars_py = [-1e3, -1., -1e-3, 1e-3, 1., 1e3]
+test_scalars_np = [np.asarray(s, dtype=dtype)
+                   for s in test_scalars_py for dtype in test_dtypes]
+test_vectors_ = [np.ones(0), np.ones(1), np.asarray(test_scalars_py)]
+test_vectors = [np.asarray(v, dtype=dtype)
+                for v in test_vectors_ for dtype in test_dtypes]
 
-@parameterized(product(all_functions, test_scalars))
+test_scalars = test_scalars_py + test_scalars_np
+
+
+@parameterized(product(all_functions, test_scalars, namespaces=['sg', 'np']))
 def test_scalar(*args):
     verify_scalar(*args)
 
-@parameterized(product(all_functions, test_vectors))
+
+@parameterized(product(all_functions, test_vectors, namespaces=['sg', 'np']))
 def test_vector(*args):
     verify_vector(*args)
 
-@parameterized((x,v) for x in test_scalars for v in test_vectors)
-def test_vector_scalar_add(x,v):
-    check_vector_scalar(x, v, lambda x, v: x+v, lambda x,v : 1.)
 
-@parameterized((x,v) for x in test_scalars for v in test_vectors)
-def test_vector_scalar_multiplication(x,v):
-    check_vector_scalar(x, v, lambda x, v: x*v, lambda x,v : v)
+@parameterized((x, v) for x in test_scalars for v in test_vectors)
+def test_vector_scalar_add(x, v):
+    check_vector_scalar(x, v, lambda x, v: x+v, lambda x, v: 1.)
+
+
+@parameterized((x, v) for x in test_scalars for v in test_vectors)
+def test_vector_scalar_multiplication(x, v):
+    check_vector_scalar(x, v, lambda x, v: x*v, lambda x, v: v)
+
 
 def test_array_priority():
     x = np.zeros(5)

@@ -23,6 +23,7 @@ from sparsegrad.base import dot
 from sparsegrad.testing.utils import check_general
 from parameterized import parameterized
 
+
 def check_dot1(x, M):
     def f(x): return dot(M, x)
     check_general(x, f, M)
@@ -52,6 +53,7 @@ def _test_dot():
         yield check_dot1, x, M
         yield check_dot2, x, M
         yield check_dot3, x, M
+
 
 @parameterized(_test_dot)
 def test_dot(func, x, M):

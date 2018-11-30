@@ -20,12 +20,15 @@
 
 import scipy.sparse
 
+
 def __parse_scipy_version():
     import scipy.version
     major, minor = scipy.version.version.split('.')[:2]
     return int(major), int(minor)
 
+
 scipy_version_major, scipy_version_minor = __parse_scipy_version()
+
 
 def dot_(a, b):
     "Proxy for a.dot(b)"
