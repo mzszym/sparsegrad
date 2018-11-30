@@ -16,20 +16,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"This module can be imported before everything else and used to redirect some of scipy functionality. Rest of sparsegrad uses scipy functions imported here."
-
-import scipy.sparse
-
-
-def __parse_scipy_version():
-    import scipy.version
-    major, minor = scipy.version.version.split('.')[:2]
-    return int(major), int(minor)
+from sparsegrad import forward
+from sparsegrad.sparsevec import *
+import numpy as np
+sparsesum = sparsesum_bare
 
 
-scipy_version_major, scipy_version_minor = __parse_scipy_version()
+def test_sparsesum():
+    idx, v = sparsesum(10, [(0, 1), (0, 1), (3, -1)], return_sparse=True)
+    assert (idx == np.asarray([0, 3])).all()
+    assert (v == np.asarray([2., -1.])).all()
 
+    x = forward.seed(np.linspace(0, 1, 11))
+    idx, d = sparsesum(
+        20, [(np.arange(11), x), (np.arange(11), x)], return_sparse=True)
+    assert (idx == np.arange(11)).all()
+    assert (d.gradient.diagonal() == 2.).all()
 
-def dot_(a, b):
-    "Proxy for a.dot(b)"
-    return a.dot(b)
+    d = sparsesum(1, [(np.zeros(2, dtype=int), np.ones(2)),
+                      (np.zeros(1, dtype=int), np.ones(1))])
+    assert d == 3

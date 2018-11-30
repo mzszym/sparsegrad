@@ -4,7 +4,7 @@ sparsegrad
 |Travis-CI-badge| |Readthedocs-badge|
 
 
-``sparsegrad`` automatically and efficiently calculates analytical Jacobian of ``numpy`` vector valued functions. It is designed to be useful for solving large systems of non-linear equations. ``sparsegrad`` is memory efficient because it does not use the graph of computation. Arbitrary computations are supported through indexing, matrix multiplication, branching, and custom functions. 
+``sparsegrad`` automatically and efficiently calculates analytical sparse Jacobian of arbitrary ``numpy`` vector valued functions. It is designed to be useful for solving large systems of non-linear equations. ``sparsegrad`` is memory efficient because it does not use the graph of computation. Arbitrary computations are supported through indexing, matrix multiplication, branching, and custom functions. 
 
 Taking Jacobian with respect to variable `x` is done by replacing numerical value of `x` with sparsegrad `seed`
 

@@ -17,18 +17,24 @@
 #
 
 import numpy as np
-from scipy import sparse
-from sparsegrad import forward
-from test_basic import check_scalar, check_general
-from sparsegrad.base import sum
-from scipy.sparse import csr_matrix
+from parameterized import parameterized
+from sparsegrad.testing.utils import verify_sparsity
+
+test_functions = ['x', 'x[::-1]', 'stack(x**2, x**3)',
+                  'stack(x**2, (x**3)[::-1])',
+                  'where(False, x, x[::-1])',
+                  'where(x >= 0, x, x[::-1])',
+                  'where(x > 0, x, x[::-1])',
+                  'sum(x)',
+                  'stack(x, sum(x))',
+                  'where(x > 0, x, sum(x))']
+
+test_vectors = [np.linspace(0, 1, 0),
+                np.linspace(0, 1, 1),
+                np.linspace(0, 1, 2),
+                np.linspace(1., 3., 3)]
 
 
-def test_simple():
-    yield check_scalar, None, 1, sum, lambda x: 1.
-
-
-def test_vector():
-    yield check_general, None, np.ones(3), sum, csr_matrix([[1, 1, 1]])
-    yield check_general, None, np.asarray([1, 2, 3]), lambda x: sum(x**2), csr_matrix([[2, 4, 6]])
-    yield check_general, None, np.asarray([3, 5, 7]), lambda x: sum(x)**2, csr_matrix([[30, 30, 30]])
+@parameterized((x, f) for x in test_vectors for f in test_functions)
+def test_sparsity(x, f):
+    verify_sparsity(dict(ns='sg'), x, f)

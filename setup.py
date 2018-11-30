@@ -34,17 +34,17 @@ setup(name='sparsegrad',
                 'sparsegrad.impl.sparsevec',
                 'sparsegrad.impl.multipledispatch',
                 'sparsegrad.sparsevec',
-                'sparsegrad.tests'],
+                'sparsegrad.testing'],
       url='http://www.marekszymanski.com/software/sparsegrad',
       license='GNU Affero General Public License v3',
       author='Marek Zdzislaw Szymanski',
       install_requires=[
           'numpy>=1.10.0',
           'scipy>=0.14.0',
-          'packaging>=14.0',
-          'nose'],
+          'nose',
+          'parameterized'],
       author_email='marek@marekszymanski.com',
-      description='pure Python automatic calculation of sparse Jacobian',
+      description='fast calculation of sparse gradients and Jacobian matrices in Python',
       long_description=open('README.rst').read(),
       include_package_data=True,
       platforms='any',
@@ -58,5 +58,4 @@ setup(name='sparsegrad',
           'Intended Audience :: Science/Research',
           'License :: OSI Approved :: GNU Affero General Public License v3',
           'Topic :: Scientific/Engineering :: Mathematics'
-      ]
-      )
+      ])
