@@ -128,6 +128,7 @@ for name, f in func.known_funcs.items():
     dispatcher.add((object,)*f.nin, getattr(np, name))
     if f.nin == 1:
         setattr(expr_base, name, function_proxy(getattr(func, name)))
+    globals()[name] = dispatcher
 
 dot = GenericFunction('dot')
 dot.add((object, object), impl.dot_)
