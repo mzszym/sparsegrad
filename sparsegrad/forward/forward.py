@@ -19,10 +19,10 @@
 import numpy as np
 from sparsegrad.impl import sparse
 from sparsegrad.impl import sparsevec as sparsevec_impl
-from sparsegrad.base import expr_base, where, dot, sum, broadcast_to
+from sparsegrad.base import expr_base
+from sparsegrad.functions import where, dot, sum, broadcast_to
 
 __all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
-
 
 class forward_value(expr_base):
     def __new__(cls, *args, **kwargs):
@@ -43,6 +43,7 @@ class forward_value(expr_base):
     @property
     def gradient(self):
         return self.deriv.tovalue()
+
     dvalue = gradient
     sparsity = gradient
 
@@ -177,7 +178,7 @@ class forward_value(expr_base):
     # Extended functions
     @classmethod
     def dot_(cls, A, x):
-        if isinstance(A, expr_base) or not isinstance(x, value):
+        if isinstance(A, value) or not isinstance(x, value):
             raise NotImplementedError('only supported dot(const,value)')
         A = sparse.csr_matrix.fromcsr(A)
         y = A.dot(x.value)

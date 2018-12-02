@@ -18,7 +18,7 @@
 
 import numpy as np
 from sparsegrad.impl.sparsevec import sparsevec
-from sparsegrad.base import sparsesum
+from sparsegrad.functions import sparsesum
 
 __all__ = ['sparsevec', 'sparsesum', 'sparsesum_bare']
 

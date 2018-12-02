@@ -20,15 +20,24 @@
 
 import numpy as np
 
+from sparsegrad.impl.multipledispatch import Dispatcher
+
 known_funcs = {}
 known_ufuncs = known_funcs
 
-
-class ufunc_deriv(object):
+class UFuncWrapper(Dispatcher):
     def __init__(self, func, deriv):
-        self.evaluate = func
+        super(UFuncWrapper, self).__init__(func.__name__)
         self.deriv = deriv
         self.nin = func.nin
+        self.add((object,)*self.nin, func)
+        self.evaluate = func
+
+#class ufunc_deriv(object):
+#    def __init__(self, func, deriv):
+#        self.evaluate = func
+#        self.deriv = deriv
+#        self.nin = func.nin
 
 
 class custom_func(object):
@@ -41,7 +50,7 @@ def uderiv(func):
     def apply(deriv):
         name = func.__name__
         assert name not in known_funcs
-        obj = ufunc_deriv(func, deriv)
+        obj = UFuncWrapper(func, deriv)
         known_funcs[name] = obj
         return obj
     return apply
@@ -201,3 +210,5 @@ def expm1(args, value):
 def log1p(args, value):
     x, = args
     yield lambda: _reciprocal(1. + x)
+
+__all__ = list(known_funcs.keys())
