@@ -16,25 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import numpy as np
-from sparsegrad.functions import routing
-from sparsegrad.impl.multipledispatch import GenericFunction
 from sparsegrad.functions import func
-
-class function_proxy(object):
-    def __init__(self, target):
-        self.target = target
-
-    def __get__(self, instance, cls):
-        return lambda *args, **kwargs: instance.apply(
-            self.target, instance, *args, **kwargs)
-
-class comparison_proxy(object):
-    def __init__(self, operator):
-        self.operator = operator
-
-    def __get__(self, instance, cls):
-        return lambda other: getattr(instance.value, self.operator)(other)
 
 class expr_base(object):
     """
@@ -76,7 +58,6 @@ class expr_base(object):
     def __div__(self, other):
         return self.apply(func.divide, self, other)
 
-
     def __rdiv__(self, other):
         return self.apply(func.divide, other, self)
 
@@ -105,26 +86,23 @@ class expr_base(object):
         return self.apply(func.abs, self)
 
 
-for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
-    setattr(expr_base, operator, comparison_proxy(operator))
-
-class wrapped_func():
-    "Wrap function for compatibility with expr_base"
-
-    def __init__(self, func):
-        self.func = func
-
-    def __call__(self, *args):
-        impl = routing.find_implementation(args, default=self)
-        return impl.apply(self.func, *args)
-
-    def apply(self, f, *args):
-        return f.evaluate(*args)
+#class wrapped_func():
+#    "Wrap function for compatibility with expr_base"
+#
+#    def __init__(self, func):
+#        self.func = func
+#
+#    def __call__(self, *args):
+#        impl = routing.find_implementation(args, default=self)
+#        return impl.apply(self.func, *args)
+#
+#    def apply(self, f, *args):
+#        return f.evaluate(*args)
 
 
-for name, f in func.known_funcs.items():
-    dispatcher = GenericFunction(name)
-    dispatcher.add((object,)*f.nin, getattr(np, name))
-    if f.nin == 1:
-        setattr(expr_base, name, function_proxy(getattr(func, name)))
-    globals()[name] = dispatcher
+#for name, f in func.known_funcs.items():
+#    dispatcher = GenericFunction(name)
+#    dispatcher.add((object,)*f.nin, getattr(np, name))
+#    if f.nin == 1:
+#        setattr(expr_base, name, function_proxy(getattr(func, name)))
+#    globals()[name] = dispatcher

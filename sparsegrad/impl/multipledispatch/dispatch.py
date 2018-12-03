@@ -101,7 +101,7 @@ class Dispatcher(object):
 
     def _dispatch_slowpath(self, signature):
         candidates = self._find(signature)
-        if len(candidates) == 1:
+        if len(candidates) == 1 or len(candidates)>1 and all(c is candidates[0] for c in candidates[1:]):
             func = self.functions[candidates[0]]
         else:
             func = RaiseDispatchError(signature, candidates)

@@ -235,6 +235,54 @@ dot.add((object, forward_value), forward_value.dot_)
 sum.add((forward_value,), forward_value.sum)
 broadcast_to.add((forward_value, object), forward_value.broadcast_to)
 
+from sparsegrad.functions import func
+from sparsegrad.functions import routing
+from sparsegrad.impl.multipledispatch import dispatch
+
+class wrapped_func():
+    "Wrap function for compatibility with expr_base"
+
+    def __init__(self, func):
+        self.func = func
+
+    def __call__(self, *args):
+        impl = routing.find_implementation(args, default=self)
+        return impl.apply(self.func, *args)
+
+    #def apply(self, f, *args):
+    #    return f.evaluate(*args)
+
+class function_proxy(object):
+    def __init__(self, target):
+        self.target = target
+
+    def __get__(self, instance, cls):
+        return lambda *args, **kwargs: instance.apply(
+            self.target, instance, *args, **kwargs)
+
+class comparison_proxy(object):
+    def __init__(self, operator):
+        self.operator = operator
+
+    def __get__(self, instance, cls):
+        return lambda other: getattr(instance.value, self.operator)(other)
+
+def _register():
+    for name, f in func.known_funcs.items():
+        ufunc = getattr(func, name)
+        wrapper = wrapped_func(ufunc)
+        for i in range(f.nin):
+            args = [object]*f.nin
+            args[i] = expr_base
+            ufunc.add(args, wrapper)
+        if f.nin == 1:
+            setattr(forward_value, name, function_proxy(ufunc))
+        #globals()[name] = dispatcher
+    for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
+        setattr(forward_value, operator, comparison_proxy(operator))
+
+_register()
+
 
 
 class forward_value_sparsity(forward_value):
