@@ -26,9 +26,11 @@ class TestDispatch(unittest.TestCase):
 
         def wrong_fun():
             raise NotImplementedError()
+        def wrong_fun2():
+            raise NotImplementedError()
         f.add((object, object), wrong_fun)
         f.add((object, int), wrong_fun)
-        f.add((int, object), wrong_fun)
+        f.add((int, object), wrong_fun2)
         with self.assertRaises(DispatchError):
             f(-1, 0)
         f.add((int, int), lambda x, y: x+y)

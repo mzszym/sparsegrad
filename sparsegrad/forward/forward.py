@@ -230,7 +230,7 @@ class forward_value(expr_base):
 
 where.add((object, forward_value, object), forward_value.where)
 where.add((object, object, forward_value), forward_value.where)
-where.add((object, forward_value, forward_value), forward_value.where)
+#where.add((object, forward_value, forward_value), forward_value.where)
 dot.add((object, forward_value), forward_value.dot_)
 sum.add((forward_value,), forward_value.sum)
 broadcast_to.add((forward_value, object), forward_value.broadcast_to)
