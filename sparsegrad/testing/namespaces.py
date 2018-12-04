@@ -17,4 +17,4 @@
 #
 
 import numpy as np
-import sparsegrad.base as sg
+import sparsegrad.functions as sg

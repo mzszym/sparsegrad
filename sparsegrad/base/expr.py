@@ -16,32 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import numpy as np
-from sparsegrad import func
-from sparsegrad import impl
-import sparsegrad.impl.sparsevec as impl_sparsevec
-
-
-class bool_expr(object):
-    "Abstract base class for boolean expressions"
-    pass
-
-
-class function_proxy(object):
-    def __init__(self, target):
-        self.target = target
-
-    def __get__(self, instance, cls):
-        return lambda *args, **kwargs: instance.apply(
-            self.target, instance, *args, **kwargs)
-
-
-class comparison_proxy(object):
-    def __init__(self, operator):
-        self.operator = operator
-
-    def __get__(self, instance, cls):
-        return lambda other: getattr(instance.value, self.operator)(other)
+from sparsegrad.functions import ufunc, ufunc_routing, routing, utils
 
 
 class expr_base(object):
@@ -55,186 +30,125 @@ class expr_base(object):
     __array_priority__ = 100
     __array_wrap__ = None
 
-    def apply(self, func, *args):
+    @classmethod
+    def apply(cls, func, args):
         """
-        Evaluate and return func(*args)
+        Apply DifferentiableFunction to args
+        """
+        raise NotImplementedError()
 
-        Subclasses do not need to call this for all functions.
+    def apply1(self, func):
+        """
+        Apply single argument DifferentiableFunction to value
         """
         raise NotImplementedError()
 
     def __add__(self, other):
-        return self.apply(func.add, self, other)
+        return self.__class__.apply(ufunc.add, (self, other))
 
     def __radd__(self, other):
-        return self.apply(func.add, other, self)
+        return self.__class__.apply(ufunc.add, (other, self))
 
     def __sub__(self, other):
-        return self.apply(func.subtract, self, other)
+        return self.__class__.apply(ufunc.subtract, (self, other))
 
     def __rsub__(self, other):
-        return self.apply(func.subtract, other, self)
+        return self.__class__.apply(ufunc.subtract, (other, self))
 
     def __mul__(self, other):
-        return self.apply(func.multiply, self, other)
+        return self.__class__.apply(ufunc.multiply, (self, other))
 
     def __rmul__(self, other):
-        return self.apply(func.multiply, other, self)
+        return self.__class__.apply(ufunc.multiply, (other, self))
 
     def __div__(self, other):
-        return self.apply(func.divide, self, other)
+        return self.__class__.apply(ufunc.divide, (self, other))
 
     def __rdiv__(self, other):
-        return self.apply(func.divide, other, self)
+        return self.__class__.apply(ufunc.divide, (other, self))
 
     def __truediv__(self, other):
-        return self.apply(func.divide, self, other)
+        return self.__class__.apply(ufunc.divide, (self, other))
 
     def __rtruediv__(self, other):
-        return self.apply(func.divide, other, self)
+        return self.__class__.apply(ufunc.divide, (other, self))
 
     def __pow__(self, other):
-        return self.apply(func.power, self, other)
+        return self.__class__.apply(ufunc.power, (self, other))
 
     def __rpow__(self, other):
-        return self.apply(func.power, other, self)
+        return self.__class__.apply(ufunc.power, (other, self))
 
     def __pos__(self):
         return self
 
     def __neg__(self):
-        return self.apply(func.negative, self)
+        return self.apply1(ufunc.negative)
 
     def __getitem__(self, idx):
-        return self.apply(func.getitem, self, idx)
+        return self.apply(ufunc.getitem, (self, idx))
 
     def __abs__(self):
-        return self.apply(func.abs, self)
+        return self.apply1(ufunc.abs)
+
+    def compare(self, operator, other):
+        raise NotImplementedError()
 
 
-for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
-    setattr(expr_base, operator, comparison_proxy(operator))
+class _comparison_proxy(object):
+    def __init__(self, operator):
+        self.operator = operator
+
+    def __get__(self, instance, cls):
+        return lambda other: instance.compare(self.operator, other)
 
 
-class wrapped_func():
-    "Wrap function for compatibility with expr_base"
+class _function_proxy1(object):
+    def __init__(self, func):
+        self.func = func
 
+    def __get__(self, instance, cls):
+        return lambda *args, **kwargs: instance.apply1(self.func)
+
+
+class _wrapper(object):
     def __init__(self, func):
         self.func = func
 
     def __call__(self, *args):
-        impl = _find_arr(args, 'apply', default=self)
-        return impl.apply(self.func, *args)
-
-    def apply(self, f, *args):
-        return f.evaluate(*args)
+        impl = routing.find_implementation(args, default=expr_base)
+        return impl.__class__.apply(self.func, args)
 
 
-for name, f in func.known_funcs.items():
-    globals()[name] = wrapped_func(getattr(func, name))
-    if f.nin == 1:
-        setattr(expr_base, name, function_proxy(getattr(func, name)))
+class _wrapper1(_wrapper):
+    def __call__(self, arg):
+        return arg.apply1(self.func)
 
 
-def _find_arr(arrays, attr, default=None, default_priority=0.):
-    highest = default
-    current = default_priority
-    for a in arrays:
-        if hasattr(a, attr):
-            priority = getattr(a, '__array_priority__', 0.)
-            if highest is None or priority > current:
-                highest, current = a, priority
-    return highest
+def _register():
+    for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
+        setattr(expr_base, operator, _comparison_proxy(operator))
+    for name, func in ufunc.known_funcs.items():
+        if func.nin == 1:
+            setattr(expr_base, name, _function_proxy1(func))
+            getattr(ufunc_routing, name).add((expr_base,), _wrapper1(func))
+        else:
+            wrapper = _wrapper(func)
+            getattr(ufunc_routing, name).addHandlers(expr_base, wrapper)
 
 
-def dot(a, b):
-    "Equivalent of scipy.sparse.dot function aware of expr_base"
-    impl_ = _find_arr((a, b), 'dot_', default=impl)
-    return impl_.dot_(a, b)
+_register()
 
 
-def where(cond, a, b):
-    "Equivalent of numpy.where function aware of expr_base"
-    impl = _find_arr((cond, a, b), 'where', default=np)
-    return impl.where(cond, a, b)
+def _apply(impl, func, args):
+    return impl.__class__.apply(func, args)
 
 
-def hstack(arrays):
-    "Equivalent of numpy.hstack function aware of expr_base"
-    impl = _find_arr(arrays, 'hstack', default=np)
-    return impl.hstack(arrays)
+routing.apply.add((expr_base, object, object), _apply)
 
 
-def sum(a):
-    "Equivalent of numpy.sum function aware of expr_base"
-    if isinstance(a, expr_base):
-        return a.sum()
-    else:
-        return np.sum(a)
+def _is_expr_numeric(x):
+    return False
 
 
-def stack(*arrays):
-    "Alias for hstack, taking arrays as separate arguments"
-    return hstack(arrays)
-
-
-def sparsesum(terms, **kwargs):
-    "Sparse summing function aware of expr_base"
-    impl_ = _find_arr(
-        (a.v for a in terms),
-        'sparsesum',
-        default=impl_sparsevec)
-    return impl_.sparsesum(terms, **kwargs)
-
-
-def as_condition_value(a):
-    "Return value as concrete boolean value"
-    return np.asarray(a, dtype=np.bool)
-
-
-def broadcast_to(arr, shape):
-    "Equivalent of numpy.broadcast_to aware of expr_base"
-    impl = _find_arr([arr], 'broadcast_to', default=np)
-    return impl.broadcast_to(arr, shape)
-
-
-def branch(cond, iftrue, iffalse):
-    """
-    Branch execution
-
-    Note that, in some cases (propagation of sparsity pattern), both branches can executed
-    more than once.
-
-    Parameters:
-    -----------
-    cond : bool vector
-        Condition
-    iftrue : callable(idx)
-        Function called to evaluate elements with indices idx, where cond is True
-    iffalse : callable(idx)
-        Function called to evaluate elements with indices idx, where cond is False
-
-    """
-    if isinstance(cond, bool_expr) and cond.hasattr('branch'):
-        return cond.branch(iftrue, iffalse)
-
-    def _branch(cond, iftrue, iffalse):
-        if not cond.shape:
-            if cond:
-                return iftrue(None)
-            return iffalse(None)
-        n = len(cond)
-        r = np.arange(len(cond))
-        ixtrue = r[cond]
-        ixfalse = r[np.logical_not(cond)]
-        vtrue = impl_sparsevec.sparsevec(
-            n, ixtrue, broadcast_to(
-                iftrue(ixtrue), ixtrue.shape))
-        vfalse = impl_sparsevec.sparsevec(
-            n, ixfalse, broadcast_to(
-                iffalse(ixfalse), ixfalse.shape))
-        return sparsesum([vtrue, vfalse])
-    value = _branch(as_condition_value(cond), iftrue, iffalse)
-    if hasattr(value, 'branch_join'):
-        return value.branch_join(cond, iftrue, iffalse)
-    return value
+utils.isnvalue.add((expr_base,), _is_expr_numeric)
