@@ -49,12 +49,15 @@ class RaiseDispatchError(object):
         self.candidates = candidates
 
     def __call__(self, *args, **kwargs):
-        raise DispatchError(
-            'Cannot unambigously resolve {signature} with candidates {candidates}. Please add {super_signature}.'.format(
-                signature=self.signature,
-                candidates=self.candidates,
-                super_signature=super_signature(
-                    self.candidates)))
+        if len(self.candidates):
+            raise DispatchError(
+                'Cannot unambigously resolve {signature} with candidates {candidates}. Please add {super_signature}.'.format(
+                    signature=self.signature,
+                    candidates=self.candidates,
+                    super_signature=super_signature(
+                        self.candidates)))
+        else:
+            raise DispatchError('Function does not have a dispatch candidate. Please add {signature}'.format(signature=self.signature))
 
 
 def dispatchSignature(values):

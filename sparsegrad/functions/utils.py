@@ -1,10 +1,11 @@
-__all__ = [ 'dot', 'where', 'sum', 'broadcast_to', 'hstack', 'stack', 'sparsesum', 'branch']
+__all__ = [ 'dot', 'where', 'sum', 'broadcast_to', 'hstack', 'stack', 'sparsesum', 'branch','isscalar','nvalue','apply','isnvalue']
 
+import numbers
+import numpy as np
 from sparsegrad import impl
 import sparsegrad.impl.sparsevec as impl_sparsevec
 from sparsegrad.impl.multipledispatch import dispatch, GenericFunction
 from . import routing
-import numpy as np
 
 dot = GenericFunction('dot')
 dot.add((object, object), impl.dot_)
@@ -68,3 +69,31 @@ def branch(cond, iftrue, iffalse):
         return sparsesum([vtrue, vfalse])
     value = _branch(cond, iftrue, iffalse)
     return value
+
+isscalar = GenericFunction('isscalar')
+def _is_number_scalar(x):
+    return True
+def _is_array_scalar(x):
+    return not x.shape
+isscalar.add((numbers.Number,), _is_number_scalar)
+isscalar.add((np.ndarray,), _is_array_scalar)
+
+nvalue = GenericFunction('nvalue')
+def _py_number_nvalue(x):
+    return x
+def _ndarray_nvalue(x):
+    return x
+nvalue.add((numbers.Number,), _py_number_nvalue)
+nvalue.add((np.ndarray,), _ndarray_nvalue)
+
+def apply(function, args):
+    impl = routing.find_implementation(args, default=None)
+    return routing.apply(impl, function, args)
+
+isnvalue = GenericFunction('isnvalue')
+def _is_pynumber_numeric(x):
+    return True
+def _is_ndarray_numeric(x):
+    return True
+isnvalue.add((numbers.Number,), _is_pynumber_numeric)
+isnvalue.add((np.ndarray,), _is_ndarray_numeric)

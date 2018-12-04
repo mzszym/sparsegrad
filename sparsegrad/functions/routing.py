@@ -1,5 +1,6 @@
 import numpy as np
-from sparsegrad.impl.multipledispatch import dispatch
+from sparsegrad.impl.multipledispatch import dispatch, GenericFunction
+from .ufunc import DifferentiableFunction
 
 @dispatch(object)
 def implementation_priority(obj):
@@ -21,3 +22,10 @@ def sparsesum(impl, terms, **kwargs):
 @dispatch(object, object)
 def hstack(impl, arrays):
     return impl.hstack(arrays)
+
+apply = GenericFunction('apply')
+
+def apply_numeric(_, func, args):
+    return func.func(*args)
+apply.add((object, object, object), apply_numeric)
+apply.add((np.ndarray, object, object), apply_numeric)

@@ -20,9 +20,18 @@ import numpy as np
 from sparsegrad.impl import sparse
 from sparsegrad.impl import sparsevec as sparsevec_impl
 from sparsegrad.base import expr_base
-from sparsegrad.functions import where, dot, sum, broadcast_to
+from sparsegrad import functions
 
-__all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
+__all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity','nvalue']
+
+def nvalue(x):
+    "return numeric value of x, x of type (forward_value, numeric types)"
+    if isinstance(x, forward_value):
+        return x.value
+    elif isinstance(x, np.ndarray):
+        return x
+    else:
+        return np.asarray(x)
 
 class forward_value(expr_base):
     def __new__(cls, *args, **kwargs):
@@ -131,21 +140,16 @@ class forward_value(expr_base):
         y = -self.value
         return self._onearg(y, -1.)
 
-    # general functions
-    def apply(self, func, *args):
-        if len(args) == 1 and args[0] is self:
-            y = func.evaluate(self.value)
-            dy = tuple(func.deriv((self.value,), y))[0]()
-            return self.__class__(value=y, deriv=self.deriv.chain(y, dy))
-        else:
-            nargs = tuple(map(nvalue, args))
-            y = func.evaluate(*nargs)
-            df = tuple(func.deriv(nargs, y))
-            terms = tuple(
-                (f(), a.deriv) for f, a in zip(
-                    df, args) if isinstance(
-                        a, forward_value))
-            return self.__class__(value=y, deriv=self.deriv.fma(y, *terms))
+    def apply1(self, func):
+        y, (dy_,) = func.f_df((self.value,))
+        return self.__class__(value=y, deriv=self.deriv.chain(y, dy_()))
+
+    @classmethod
+    def apply(cls, func, args):
+        nargs = tuple(map(nvalue, args))
+        y, df = func.f_df(nargs)
+        terms = tuple((f(), a.deriv) for f, a in zip(df, args) if isinstance(a, forward_value))
+        return cls(value=y, deriv=terms[0][1].fma(y, *terms))
 
     # indexing
     def getitem_array(self, idx):
@@ -227,63 +231,22 @@ class forward_value(expr_base):
             return self
         return np.ones(shape) * self
 
+    def compare(self, operator, other):
+        return getattr(self.value, operator)(other)
 
-where.add((object, forward_value, object), forward_value.where)
-where.add((object, object, forward_value), forward_value.where)
-#where.add((object, forward_value, forward_value), forward_value.where)
-dot.add((object, forward_value), forward_value.dot_)
-sum.add((forward_value,), forward_value.sum)
-broadcast_to.add((forward_value, object), forward_value.broadcast_to)
+def forward_value_isscalar(x):
+    return not x.value.shape
 
-from sparsegrad.functions import func
-from sparsegrad.functions import routing
-from sparsegrad.impl.multipledispatch import dispatch
+def forward_value_nvalue(x):
+    return x.value
 
-class wrapped_func():
-    "Wrap function for compatibility with expr_base"
-
-    def __init__(self, func):
-        self.func = func
-
-    def __call__(self, *args):
-        impl = routing.find_implementation(args, default=self)
-        return impl.apply(self.func, *args)
-
-    #def apply(self, f, *args):
-    #    return f.evaluate(*args)
-
-class function_proxy(object):
-    def __init__(self, target):
-        self.target = target
-
-    def __get__(self, instance, cls):
-        return lambda *args, **kwargs: instance.apply(
-            self.target, instance, *args, **kwargs)
-
-class comparison_proxy(object):
-    def __init__(self, operator):
-        self.operator = operator
-
-    def __get__(self, instance, cls):
-        return lambda other: getattr(instance.value, self.operator)(other)
-
-def _register():
-    for name, f in func.known_funcs.items():
-        ufunc = getattr(func, name)
-        wrapper = wrapped_func(ufunc)
-        for i in range(f.nin):
-            args = [object]*f.nin
-            args[i] = expr_base
-            ufunc.add(args, wrapper)
-        if f.nin == 1:
-            setattr(forward_value, name, function_proxy(ufunc))
-        #globals()[name] = dispatcher
-    for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
-        setattr(forward_value, operator, comparison_proxy(operator))
-
-_register()
-
-
+functions.where.add((object, forward_value, object), forward_value.where)
+functions.where.add((object, object, forward_value), forward_value.where)
+functions.dot.add((object, forward_value), forward_value.dot_)
+functions.sum.add((forward_value,), forward_value.sum)
+functions.broadcast_to.add((forward_value, object), forward_value.broadcast_to)
+functions.nvalue.add((forward_value, ), forward_value_nvalue)
+functions.isscalar.add((forward_value,), forward_value_isscalar)
 
 class forward_value_sparsity(forward_value):
     # inherited where happens to conserve sparsity
@@ -310,16 +273,5 @@ def seed_sparsity(x, T=forward_value_sparsity):
 
 
 seed_sparse_gradient = seed
-
-
-def nvalue(x):
-    "return numeric value of an object, as ndarray"
-    if isinstance(x, forward_value):
-        return x.value
-    elif isinstance(x, np.ndarray):
-        return x
-    else:
-        return np.asarray(x)
-
 
 value = forward_value
