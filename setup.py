@@ -18,11 +18,8 @@
 
 from setuptools import setup
 
-import os
-import sys
-sys.path.insert(0, os.path.abspath('.'))
-
-from sparsegrad import version
+with open('sparsegrad/_version.py') as version_file:
+    exec(version_file.read())
 
 setup(name='sparsegrad',
       version=version,
