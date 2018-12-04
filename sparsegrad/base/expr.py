@@ -18,6 +18,7 @@
 
 from sparsegrad.functions import ufunc, ufunc_routing, routing, utils
 
+
 class expr_base(object):
     """
     Base class for numpy-compatible operator overloading
@@ -93,6 +94,7 @@ class expr_base(object):
     def compare(self, operator, other):
         raise NotImplementedError()
 
+
 class _comparison_proxy(object):
     def __init__(self, operator):
         self.operator = operator
@@ -100,12 +102,14 @@ class _comparison_proxy(object):
     def __get__(self, instance, cls):
         return lambda other: instance.compare(self.operator, other)
 
+
 class _function_proxy1(object):
     def __init__(self, func):
         self.func = func
 
     def __get__(self, instance, cls):
         return lambda *args, **kwargs: instance.apply1(self.func)
+
 
 class _wrapper(object):
     def __init__(self, func):
@@ -115,9 +119,11 @@ class _wrapper(object):
         impl = routing.find_implementation(args, default=expr_base)
         return impl.__class__.apply(self.func, args)
 
+
 class _wrapper1(_wrapper):
     def __call__(self, arg):
         return arg.apply1(self.func)
+
 
 def _register():
     for operator in ['__lt__', '__le__', '__eq__', '__ne__', '__ge__', '__gt__']:
@@ -129,11 +135,20 @@ def _register():
         else:
             wrapper = _wrapper(func)
             getattr(ufunc_routing, name).addHandlers(expr_base, wrapper)
+
+
 _register()
+
 
 def _apply(impl, func, args):
     return impl.__class__.apply(func, args)
+
+
 routing.apply.add((expr_base, object, object), _apply)
+
+
 def _is_expr_numeric(x):
     return False
+
+
 utils.isnvalue.add((expr_base,), _is_expr_numeric)

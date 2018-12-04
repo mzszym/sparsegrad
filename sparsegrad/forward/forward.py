@@ -22,7 +22,8 @@ from sparsegrad.impl import sparsevec as sparsevec_impl
 from sparsegrad.base import expr_base
 from sparsegrad import functions
 
-__all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity','nvalue']
+__all__ = ['value', 'seed', 'seed_sparse_gradient', 'seed_sparsity', 'nvalue']
+
 
 def nvalue(x):
     "return numeric value of x, x of type (forward_value, numeric types)"
@@ -32,6 +33,7 @@ def nvalue(x):
         return x
     else:
         return np.asarray(x)
+
 
 class forward_value(expr_base):
     def __new__(cls, *args, **kwargs):
@@ -148,7 +150,8 @@ class forward_value(expr_base):
     def apply(cls, func, args):
         nargs = tuple(map(nvalue, args))
         y, df = func.f_df(nargs)
-        terms = tuple((f(), a.deriv) for f, a in zip(df, args) if isinstance(a, forward_value))
+        terms = tuple((f(), a.deriv)
+                      for f, a in zip(df, args) if isinstance(a, forward_value))
         return cls(value=y, deriv=terms[0][1].fma(y, *terms))
 
     # indexing
@@ -234,11 +237,14 @@ class forward_value(expr_base):
     def compare(self, operator, other):
         return getattr(self.value, operator)(other)
 
+
 def forward_value_isscalar(x):
     return not x.value.shape
 
+
 def forward_value_nvalue(x):
     return x.value
+
 
 functions.where.add((object, forward_value, object), forward_value.where)
 functions.where.add((object, object, forward_value), forward_value.where)
@@ -247,6 +253,7 @@ functions.sum.add((forward_value,), forward_value.sum)
 functions.broadcast_to.add((forward_value, object), forward_value.broadcast_to)
 functions.nvalue.add((forward_value, ), forward_value_nvalue)
 functions.isscalar.add((forward_value,), forward_value_isscalar)
+
 
 class forward_value_sparsity(forward_value):
     # inherited where happens to conserve sparsity

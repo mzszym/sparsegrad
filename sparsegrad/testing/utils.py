@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 #
 
 __all__ = [
@@ -31,6 +30,7 @@ from sparsegrad.testing import namespaces
 import numpy as np
 from sparsegrad import forward
 import scipy.sparse
+
 
 def check_scalar(x, f, df):
     y = f(forward.seed(x))

@@ -26,8 +26,10 @@ from .import ufunc_routing
 known_funcs = {}
 known_ufuncs = known_funcs
 
+
 class DifferentiableFunction(object):
     pass
+
 
 class SplitElementwiseDifferentiableFunction(DifferentiableFunction):
     def __init__(self, func, deriv):
@@ -38,6 +40,7 @@ class SplitElementwiseDifferentiableFunction(DifferentiableFunction):
         y = self.func(*nargs)
         return y, self.deriv(nargs, y)
 
+
 class OneCallElementwiseDifferentiableFunction(DifferentiableFunction):
     def __init__(self, f_df):
         self.f_df = f_df
@@ -47,6 +50,7 @@ class OneCallElementwiseDifferentiableFunction(DifferentiableFunction):
 
     def deriv(self, nargs, y):
         raise NotImplementedError()
+
 
 class FunctionDispatcher(Dispatcher):
     def __init__(self, name, func, **kwargs):
@@ -61,10 +65,12 @@ class FunctionDispatcher(Dispatcher):
             types[i] = value_type
             self.add(types, func)
 
+
 class UFuncWrapper(SplitElementwiseDifferentiableFunction):
     def __init__(self, func, deriv):
         super(UFuncWrapper, self).__init__(func, deriv)
         self.nin = func.nin
+
 
 def uderiv(func):
     def apply(deriv):
@@ -228,12 +234,16 @@ def expm1(args, value):
     x, = args
     yield lambda: np.exp(x)
 
+
 @uderiv(np.log1p)
 def log1p(args, value):
     x, = args
     yield lambda: _reciprocal(1. + x)
 
-__all__ = ['SplitElementwiseDifferentiableFunction', 'OneCallElementwiseDifferentiableFunction','asdifferentiable']
+
+__all__ = ['SplitElementwiseDifferentiableFunction',
+           'OneCallElementwiseDifferentiableFunction', 'asdifferentiable']
+
 
 def asdifferentiable(f=None, deriv=None, f_df=None):
     if f_df is not None:

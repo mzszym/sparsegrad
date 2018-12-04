@@ -16,7 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__all__ = ['GenericFunction', 'GenericMethod', 'Dispatcher', 'DispatchError', 'dispatch', 'dispatchmethod']
+__all__ = ['GenericFunction', 'GenericMethod', 'Dispatcher',
+           'DispatchError', 'dispatch', 'dispatchmethod']
 
 
 def supersedes(a, b):
@@ -57,7 +58,8 @@ class RaiseDispatchError(object):
                     super_signature=super_signature(
                         self.candidates)))
         else:
-            raise DispatchError('Function does not have a dispatch candidate. Please add {signature}'.format(signature=self.signature))
+            raise DispatchError('Function does not have a dispatch candidate. Please add {signature}'.format(
+                signature=self.signature))
 
 
 def dispatchSignature(values):
@@ -108,7 +110,7 @@ class Dispatcher(object):
 
     def _dispatch_slowpath(self, signature):
         candidates = self._find(signature)
-        if len(candidates) == 1 or len(candidates)>1 and self._all_same(candidates):
+        if len(candidates) == 1 or len(candidates) > 1 and self._all_same(candidates):
             func = self.functions[candidates[0]]
         else:
             func = RaiseDispatchError(signature, candidates)
@@ -191,6 +193,7 @@ def GenericFunction(self, *args, **kwargs):
 def GenericMethod(self, *args, **kwargs):
     return MethodDispatcher(*args, **kwargs)
 
+
 def _dispatch(types, dispatcher_type, kwargs):
     def _(func):
         result = dispatcher_type(func.__name__, **kwargs)
@@ -198,8 +201,10 @@ def _dispatch(types, dispatcher_type, kwargs):
         return result
     return _
 
+
 def dispatch(*types, **kwargs):
     return _dispatch(types, Dispatcher, kwargs)
+
 
 def dispatchmethod(*types, **kwargs):
     return _dispatch(types, MethodDispatcher, kwargs)

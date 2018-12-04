@@ -26,6 +26,7 @@ class TestDispatch(unittest.TestCase):
 
         def wrong_fun():
             raise NotImplementedError()
+
         def wrong_fun2():
             raise NotImplementedError()
         f.add((object, object), wrong_fun)
