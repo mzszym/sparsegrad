@@ -49,7 +49,7 @@ def _test_dot():
     np.random.seed(0)
     for n in [0, 1, 3, 5]:
         x = np.random.rand(n)
-        M = scipy.sparse.csr_matrix(np.matrix(np.random.rand(n, n)))
+        M = scipy.sparse.csr_matrix(np.random.rand(n, n))
         yield check_dot1, x, M
         yield check_dot2, x, M
         yield check_dot3, x, M

@@ -98,7 +98,7 @@ Access gradient as sparse matrix:
 
 .. code:: python
 
-    print(y.dvalue.todense())
+    print(y.dvalue.toarray())
 
 
 .. parsed-literal::
@@ -163,7 +163,7 @@ Access positions of possible nonzeros as scipy CSR matrix:
 
 .. code:: python
 
-    print(y.sparsity.tocsr().todense())
+    print(y.sparsity.tocsr().toarray())
 
 
 .. parsed-literal::

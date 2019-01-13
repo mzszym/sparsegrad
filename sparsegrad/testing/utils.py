@@ -72,7 +72,7 @@ def check_vector_scalar(x, v, f, df):
     y = f(forward.seed(x), v)
     assert_almost_equal(y.value, f(x, v))
     assert y.dvalue.shape == (len(y.value), 1)
-    assert_almost_equal(np.asarray(y.dvalue.todense()).flatten(), df(x, v))
+    assert_almost_equal(y.dvalue.toarray().ravel(), df(x, v))
 
 
 def check_general(x, f, grad):

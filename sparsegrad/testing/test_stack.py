@@ -60,7 +60,7 @@ def test_split_stack(n):
 def test_vector_scalar(x, y):
     df2d = np.atleast_2d(df(x))
     dv = np.atleast_2d(np.zeros_like(y)).transpose()
-    dgxy2d = g(forward.seed(x) * y).dvalue.todense()
+    dgxy2d = g(forward.seed(x) * y).dvalue.toarray()
     check_general(
         x, lambda x: stack(
             f(x), y), csr_matrix(

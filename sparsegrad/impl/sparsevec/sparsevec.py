@@ -73,7 +73,7 @@ def sparsesum(terms, hstack=np.hstack, nvalue=lambda x: x,
 
     def process_dense(n, idx, v):
         y = csr_matrix((nvalue(v), idx, np.asarray(
-            [0, len(idx)])), shape=(1, n)).todense().A1
+            [0, len(idx)])), shape=(1, n)).toarray().ravel()
         return wrap(idx, v, y)
 
     def process_compressed(n, idx, v):
