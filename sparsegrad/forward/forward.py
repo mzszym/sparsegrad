@@ -219,7 +219,7 @@ class forward_value(expr_base):
         return self.__class__(value=y, deriv=dy)
 
     def hstack(self, arrays):
-        y = np.hstack(nvalue(a) for a in arrays)
+        y = np.hstack([nvalue(a) for a in arrays])
 
         def deriv(arr):
             if isinstance(arr, forward_value):
