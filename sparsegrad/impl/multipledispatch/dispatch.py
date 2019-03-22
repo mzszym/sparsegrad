@@ -17,7 +17,7 @@
 #
 
 __all__ = ['GenericFunction', 'GenericMethod', 'Dispatcher',
-           'DispatchError', 'dispatch', 'dispatchmethod']
+           'DispatchError', 'dispatch', 'dispatchmethod','MethodDispatcher']
 
 
 def supersedes(a, b):

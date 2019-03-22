@@ -17,12 +17,11 @@
 #
 
 __all__ = ['dot', 'where', 'sum', 'broadcast_to', 'hstack', 'stack',
-           'sparsesum', 'branch', 'isscalar', 'nvalue', 'apply', 'isnvalue']
+           'branch', 'isscalar', 'nvalue', 'apply', 'isnvalue']
 
 import numbers
 import numpy as np
 from sparsegrad import impl
-import sparsegrad.impl.sparsevec as impl_sparsevec
 from sparsegrad.impl.multipledispatch import dispatch, GenericFunction
 from . import routing
 
@@ -47,14 +46,6 @@ def hstack(arrays):
 def stack(*arrays):
     "Alias for hstack, taking arrays as separate arguments"
     return hstack(arrays)
-
-
-def sparsesum(terms, **kwargs):
-    "Generalized version of sparsesum"
-    impl = routing.find_implementation(
-        (a.v for a in terms), default=impl_sparsevec)
-    return routing.sparsesum(impl, terms, **kwargs)
-
 
 @dispatch(object, object, object)
 def branch(cond, iftrue, iffalse):

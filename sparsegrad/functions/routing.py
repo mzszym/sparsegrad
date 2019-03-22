@@ -35,12 +35,6 @@ def find_implementation(arrays, default=np, default_priority=0):
             highest, current = a, priority
     return highest
 
-
-@dispatch(object, object)
-def sparsesum(impl, terms, **kwargs):
-    return impl.sparsesum(terms, **kwargs)
-
-
 @dispatch(object, object)
 def hstack(impl, arrays):
     return impl.hstack(arrays)

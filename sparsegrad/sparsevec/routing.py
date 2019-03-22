@@ -16,4 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .sparsevec import *
+from sparsegrad.impl.multipledispatch import dispatch
+
+@dispatch(object, object)
+def sparsesum(impl, terms, **kwargs):
+    return impl.sparsesum(terms, **kwargs)

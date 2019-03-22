@@ -1,7 +1,7 @@
 # -*- coding: utf-8; -*-
 #
 # sparsegrad - automatic calculation of sparse gradient
-# Copyright (C) 2016-2018 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
+# Copyright (C) 2016-2019 Marek Zdzislaw Szymanski (marek@marekszymanski.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -16,13 +16,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import numpy as np
-from sparsegrad.impl.sparsevec import sparsevec
-from sparsegrad.functions import sparsesum
-
 __all__ = ['sparsevec', 'sparsesum', 'sparsesum_bare']
 
+import sparsegrad.impl.sparsevec as impl_sparsevec
+from . import routing
+import sparsegrad.functions.routing as r_
+from sparsegrad.impl.multipledispatch import dispatch, GenericFunction
+import numpy as np
 
+def sparsesum(terms, **kwargs):
+    "Generalized version of sparsesum"
+    impl = r_.find_implementation(
+        (a.v for a in terms), default=impl_sparsevec)
+    return routing.sparsesum(impl, terms, **kwargs)
+
+sparsevec = GenericFunction('sparsevec')
+sparsevec.add((object, object, object), impl_sparsevec.sparsevec)
+
+@dispatch(object, object)
 def sparsesum_bare(n, terms, return_sparse=False, **kwargs):
     terms = list(terms)
     if not terms:
