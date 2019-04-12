@@ -22,18 +22,17 @@ from .ufunc import DifferentiableFunction
 
 
 @dispatch(object)
-def implementation_priority(obj):
-    return getattr(obj, '__array_priority__', 0)
-
+def get_implementation(obj):
+    return getattr(obj, '__array_priority__', 0), obj
 
 def find_implementation(arrays, default=np, default_priority=0):
-    highest = default
-    current = default_priority
+    best_impl = default
+    best_priority = default_priority
     for a in arrays:
-        priority = implementation_priority(a)
-        if highest is None or priority > current:
-            highest, current = a, priority
-    return highest
+        priority, impl = get_implementation(a)
+        if best_impl is None or priority > best_priority:
+            best_priority, best_impl = priority, impl
+    return best_impl
 
 @dispatch(object, object)
 def hstack(impl, arrays):
