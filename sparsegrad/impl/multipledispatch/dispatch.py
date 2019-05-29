@@ -145,6 +145,7 @@ class Dispatcher(object):
         self.functions = state['functions']
         self.signatures = state['signatures']
         self.doc = state['doc']
+        self._cache = dict()
 
     @property
     def __doc__(self):
