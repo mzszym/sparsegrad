@@ -149,24 +149,29 @@ class Dispatcher(object):
 
     @property
     def __doc__(self):
+        def safestr(x):
+            try:
+                return str(x)
+            except ValueError:
+                return "\n".join(x)
         lines = ['Multiply dispatched method {name}:'.format(name=self.name)]
         if self.doc is not None:
-            lines.append('\t'.join(str(self.doc).splitlines()))
+            lines.extend('\t'+s for s in str(self.doc).splitlines())
             lines.append('')
-        lines = [
+        lines.append(
             '{count} known implentations:'.format(
                 count=len(
-                    self.signatures))]
+                    self.signatures)))
         for index, signature in enumerate(self.signatures):
             function = self.functions[signature]
             lines.append(
                 '{index} {signature}: '.format(
                     index=index,
                     signature=signature))
+            print(function.__module__ + '-' + function.__name__)
             if function.__doc__ is not None:
-                lines.append('\t'.join(str(function.__doc__)).splitlines())
+                lines.extend('\t'+s for s in str(function.__doc__).splitlines())
         return '\n'.join(lines)
-
 
 class BoundMethod(object):
     def __init__(self, dispatcher, instance, owner):
@@ -187,13 +192,12 @@ class MethodDispatcher(Dispatcher):
         return BoundMethod(self, instance, cls)
 
 
-def GenericFunction(self, *args, **kwargs):
+def GenericFunction(*args, **kwargs):
     return Dispatcher(*args, **kwargs)
 
 
-def GenericMethod(self, *args, **kwargs):
+def GenericMethod(*args, **kwargs):
     return MethodDispatcher(*args, **kwargs)
-
 
 def _dispatch(types, dispatcher_type, kwargs):
     def _(func):

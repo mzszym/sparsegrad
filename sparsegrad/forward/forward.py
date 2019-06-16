@@ -17,6 +17,7 @@
 #
 
 import numpy as np
+import numbers
 from sparsegrad.impl import sparse
 from sparsegrad.impl import sparsevec as sparsevec_impl
 from sparsegrad.base import expr_base
@@ -278,6 +279,16 @@ def seed_sparsity(x, T=forward_value_sparsity):
     else:
         return T(value=x, deriv=sparse.sparsity_csr(mshape=(None, None)))
 
+# dvalue
+def _dvalue_simple(y, x):
+    return y.dvalue
+def _dvalue_zero_scalar(y, x):
+    return _dvalue_zero_array(np.asarray(y), x)
+def _dvalue_zero_array(y, x):
+    return x.deriv.zero(y).tovalue()
+functions.dvalue.add((forward_value, forward_value), _dvalue_simple)
+functions.dvalue.add((numbers.Number, forward_value), _dvalue_zero_scalar)
+functions.dvalue.add((np.ndarray, forward_value), _dvalue_zero_array)
 
 seed_sparse_gradient = seed
 
