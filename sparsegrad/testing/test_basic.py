@@ -88,7 +88,7 @@ if hasattr(np, 'float128'):
     real_dtypes.append(np.float128)
 complex_dtypes = [np.complex128]
 if hasattr(np, 'complex256'):
-    complex_dtypes.append([np.complex256])
+    complex_dtypes.append(np.complex256)
 test_dtypes = real_dtypes + complex_dtypes
 test_scalars_py = [-1e3, -1., -1e-3, 1e-3, 1., 1e3]
 test_scalars_np = [np.asarray(s, dtype=dtype)
