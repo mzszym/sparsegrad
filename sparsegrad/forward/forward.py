@@ -42,10 +42,7 @@ class forward_value(expr_base):
         deriv = kwargs.pop('deriv')
         assert hasattr(value, 'shape')
         assert isinstance(deriv, sparse.sdcsr)
-        if not value.shape:
-            assert deriv.mshape[0] is None
-        else:
-            assert deriv.mshape[0] == len(value)
+        assert deriv.mshape[0] == value.shape
         obj = super(forward_value, cls).__new__(cls, *args, **kwargs)
         obj.value = value
         obj.deriv = deriv
@@ -55,6 +52,10 @@ class forward_value(expr_base):
     @property
     def gradient(self):
         return self.deriv.tovalue()
+
+    @property
+    def indexing(self):
+        return self.deriv.indexing
 
     dvalue = gradient
     sparsity = gradient
@@ -159,6 +160,7 @@ class forward_value(expr_base):
     def getitem_array(self, idx):
         x = self.value
         if idx.dtype == np.bool:
+            # TODO: not the most efficient probably
             idx = np.arange(len(idx))[idx]
         y = np.take(x, idx)
         n = len(idx)
@@ -166,22 +168,18 @@ class forward_value(expr_base):
             idx = (idx + n) % n
         return self.__class__(value=y, deriv=self.deriv.getitem_arrayp(y, idx))
 
-    def getitem_slice(self, idx):
-        y = np.asarray(self.value[idx])
+    def getitem_general(self, *idx):
+        y = np.asarray(self.value.__getitem__(*idx))
         return self.__class__(
-            value=y, deriv=self.deriv.getitem_general(y, idx))
-    getitem_scalar = getitem_slice
+            value=y, deriv=self.deriv.getitem_general(y, *idx))
 
-    def __getitem__(self, idx):
-        if isinstance(idx, np.ndarray):
-            if idx.shape:
-                return self.getitem_array(idx)
-            else:
-                return self.getitem_scalar(idx)
-        elif isinstance(idx, slice):
-            return self.getitem_slice(idx)
-        else:
-            return self.getitem_scalar(idx)
+    getitem_scalar = getitem_general
+    getitem_slice = getitem_general
+
+    def __getitem__(self, *idx):
+        if len(idx) == 1 and isinstance(idx[0], np.ndarray) and len(idx[0].shape) == 1:
+            return self.getitem_array(*idx)
+        return self.getitem_general(*idx)
 
     # Extended functions
     @classmethod
@@ -209,8 +207,9 @@ class forward_value(expr_base):
                     n, M.shape[1]))
             M.sort_indices()
             M = M.tocsr()
+            # This needs checking and refactoring to work with N-D arrays.
             return forward_value(
-                value=y, deriv=self.deriv.__class__(mshape=M.shape, M=M))
+                value=y, deriv=self.deriv.__class__(mshape=((M.shape[0],),(M.shape[1],)), M=M))
         return sparsevec_impl.sparsesum(
             terms, hstack=self.hstack, nvalue=nvalue, wrap=wrap, **kwargs)
 
@@ -265,19 +264,13 @@ class forward_value_sparsity(forward_value):
 
 def seed(x, T=forward_value):
     x = np.asarray(x)
-    if x.shape:
-        return T(value=x, deriv=sparse.sdcsr(mshape=(x.shape[0], x.shape[0])))
-    else:
-        return T(value=x, deriv=sparse.sdcsr(mshape=(None, None)))
+    return T(value=x, deriv=sparse.sdcsr(mshape=(x.shape, x.shape)))
 
 
 def seed_sparsity(x, T=forward_value_sparsity):
     x = np.asarray(x)
-    if x.shape:
-        return T(value=x, deriv=sparse.sparsity_csr(
-            mshape=(x.shape[0], x.shape[0])))
-    else:
-        return T(value=x, deriv=sparse.sparsity_csr(mshape=(None, None)))
+    return T(value=x, deriv=sparse.sparsity_csr(
+            mshape=(x.shape, x.shape)))
 
 # dvalue
 def _dvalue_simple(y, x):

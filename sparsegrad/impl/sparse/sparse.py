@@ -21,6 +21,7 @@ This module contains implementation details sparse matrix operations
 """
 
 import numpy as np
+import warnings
 from sparsegrad import impl
 __all__ = [
     'sdcsr',
@@ -134,6 +135,11 @@ def diagonal(x, n):
     "Return n x n matrix diag(x)"
     return csr_matrix.fromarrays(x, np.arange(n), np.arange(n + 1), (n, n))
 
+def product(numbers):
+    j = 1
+    for i in numbers:
+        j *= i
+    return j
 
 class sdcsr(object):
     r"""
@@ -146,8 +152,12 @@ class sdcsr(object):
     where s is scalar, diag is row scaling vector (scalar and vector allowed), and
     M is general part (None is allowed to indicate diagonal matrix).
 
-    mshape stores matrix shape. None for mshape[0] denotes differentation of scalar.
-    None for mshape[1] denotes differentiation with repsect to scalar.
+    If diag is not None, it should have shape of mshape[0]
+
+    It is allowed for diag to be multidimensional. Then, flattened version is used.
+
+    mshape stores matrix shape, and shapes of output and input function. Each
+    member of mshape is a tuple describing dimension of (output, input).
 
     No copies of M, diag are made, therefore they must be constant objects.
     """
@@ -156,25 +166,29 @@ class sdcsr(object):
         self.mshape = mshape
         self.s = s
         self.diag = diag
-        #assert M is None or isinstance(M,scipy.sparse.csr_matrix), 'invalid matrix type %r'%M.__class__
+        assert diag.shape == () or diag.shape == mshape[0]
+        assert M is None or isinstance(M,scipy_sparse.csr_matrix), 'invalid matrix type %r'%M.__class__
         self.M = M
         self._value = None
+
+        # let's try for the moment
+        self._indexing = None
 
     def _evaluate(self):
         p = self.s * self.diag
         if self.M is None:
-            if self.mshape == (None, None):
+            # If general part is missing, matrix is be square
+            if self.mshape == ((), ()):
+                # Return scalar
                 return p
             else:
-                n = self.mshape[0]
-                # self.mshape[1] must be n
-                if not p.shape:
-                    v = np.empty(n, dtype=p.dtype)
-                    v.fill(p)
-                    p = v
-                return diagonal(p, n)
+                if p.shape != self.mshape[0]:
+                    p = np.broadcast_to(p, self.mshape[0])
+                return diagonal(p.ravel(), product(self.mshape[0]))
         else:
             if p.shape:
+                if p.shape != self.M.shape[0]:
+                    p = np.broadcast_to(p, self.mshape[0]).ravel()
                 return csr_matrix.fromarrays(self.M.data[:self.M.indptr[-1]] * np.repeat(
                     p, np.diff(self.M.indptr)), self.M.indices, self.M.indptr, self.M.shape)
             else:
@@ -190,24 +204,41 @@ class sdcsr(object):
             self._value = self._evaluate()
         return self._value
 
-    def getitem_general(self, output, idx):
+    @property
+    def indexing(self):
+        if self._indexing is None:
+            self._indexing = np.arange(product(self.mshape[0])).reshape(self.mshape[0])
+        return self._indexing
+
+    def get_flat_idx(self, *idx):
+        if len(self.mshape[0]) == 1:
+            return idx
+        return self.indexing.__getitem__(*idx).ravel()
+
+    def getitem_general(self, output, *idx):
         "Generate Jacobian matrix for operation output=x[idx], this matrix being Jacobian of x. General version."
+        # This is very inefficient and must be fixed!
+        flat_idx = self.get_flat_idx(*idx)
         mshape = self._mshape(output)
         if self.M is None:
-            v = self.tovalue()[idx]
+            v = self.tovalue()[flat_idx]
             return self.__class__(mshape=mshape, M=v)
         else:
             M = self.M[idx]
-            if self.diag.shape:
-                diag = np.asarray(self.diag[idx])
+            if self.diag.shape != self.mshape[0]:
+                # TODO: unnecessary in some cases (diag.shape==())
+                diag = np.broadcast_to(self.diag, self.mshape[0]).__getitem__(*idx)
             else:
-                diag = self.diag
+                diag=self.diag.__getitem__(*idx)
             return self.__class__(mshape=mshape, s=self.s, diag=diag, M=M)
 
     def getitem_arrayp(self, output, idx):
-        "Generate Jacobian matrix for operation output=x[idx], this matrix being Jacobian of x. idx is array with all entries positive."
+        """
+        Generate Jacobian matrix for operation output=x[idx], this matrix being Jacobian of x.
+        idx is array with all entries positive and scalar.
+        """
         if self.diag.shape:
-            p = self.s * np.take(self.diag, idx)
+            p = self.s * np.take(self.diag.ravel(), idx)
         else:
             p = self.s * self.diag
         n = len(idx)
@@ -215,16 +246,10 @@ class sdcsr(object):
         if self.M is None:
             data = np.ones(n, dtype=p.dtype)
             indptr = np.arange(len(idx) + 1)
-            P = csr_matrix.fromarrays(data, idx, indptr, mshape)
+            P = csr_matrix.fromarrays(data, idx, indptr, (product(mshape[0]),product(mshape[1])))
             return self.new(mshape, p, P)
         else:
             return self.new(mshape, p, csr_matrix.getrows(self.M, idx))
-        #
-        #P = csr_matrix.fromarrays(np.ones(n,dtype=dtype),idx,np.arange(len(idx)+1),mshape)
-        # if self.M is not None:
-        #    return self.new(mshape,p,P * self.M)
-        # else:
-        #    return self.new(mshape,p,P)
 
     @classmethod
     def new(cls, mshape, diag=np.asarray(1), M=None):
@@ -240,27 +265,24 @@ class sdcsr(object):
         if mshape == (None, None):
             return self.__class__(mshape, s=np.asarray(0.))
         else:
-            n, m = mshape
-            if n is None:
-                n = 1
-            if m is None:
-                m = 1
-            return self.__class__(mshape, M=csr_matrix((n, m)))
+            shape = (product(mshape[0]), product(mshape[1]))
+            return self.__class__(mshape, M=csr_matrix(shape))
 
     def _mshape(self, output):
-        if output.shape:
-            return (output.shape[0], self.mshape[1])
-        else:
-            return (None, self.mshape[1])
+        return (output.shape, self.mshape[1])
 
-    def _broadcast(self, n):
+    def _broadcast(self, shape):
         # Workaround for numpy bug. Sometimes scalar + [scalar] is returned as
         # scalar.
-        if n is None:
-            n = 1
+        if shape == ():
+            shape=(1,)
+
+        indexing = np.arange(product(self.mshape[0]))
+        broadcast_index = np.broadcast_to(indexing, shape)
+        n=product(shape)
 
         B = csr_matrix.fromarrays(
-            np.ones(n), np.zeros(n), np.arange(
+            np.ones(n), broadcast_index, np.arange(
                 n + 1), (n, 1))
         if self.M is None:
             return B
@@ -296,10 +318,7 @@ class sdcsr(object):
         Returns sum(d.chain(output,x) for x,d in terms)
         """
         xfirst, dfirst = terms[0]
-        if output.shape:
-            mshape = (output.shape[0], dfirst.mshape[1])
-        else:
-            mshape = (None, dfirst.mshape[1])
+        mshape = (output.shape, dfirst.mshape[1])
         M = dfirst.M
         if all(d.M is M for x, d in terms[1:]):
             diag = sum((d.s * x) * d.diag for x, d in terms)
@@ -328,15 +347,16 @@ class sdcsr(object):
     def rdot(self, y, other):
         r"Return Jacobian of :math:`\mathbf{y} = \mathbf{other} \cdot \mathbf{self}`, with :math:`\cdot` denoting matrix multiplication."
         d = csr_matrix.fromcsr(other) * self.tovalue()
+        mshape = (y.shape, self.mshape[1])
         if d.shape:
-            return self.__class__(d.shape, M=d)
+            return self.__class__(mshape, M=d)
         else:
-            return self.__class__((None, self.mshape[1]), s=d)
+            return self.__class__(mshape, s=d)
 
     def sum(self):
         "Return Jacobian of y=sum(x), this matrix being Jacobian of x"
         v = self.tovalue()
-        mshape = (None, self.mshape[1])
+        mshape = ((), self.mshape[1])
         if v.shape:
             return self.__class__(
                 mshape, M=csr_matrix(self.tovalue().sum(axis=0)))
@@ -366,11 +386,9 @@ class sparsity_csr(sdcsr):
 
     @classmethod
     def fma(cls, output, *terms):
+        # TODO: repetition from super
         xfirst, dfirst = terms[0]
-        if output.shape:
-            mshape = (output.shape[0], dfirst.mshape[1])
-        else:
-            mshape = (None, dfirst.mshape[1])
+        mshape = (output.shape, dfirst.mshape[1])
         M = dfirst.M
         if all(d.M is M for x, d in terms[1:]):
             if mshape[0] != dfirst.mshape[0]:
